@@ -1,7 +1,7 @@
 [dependencies]
 arrayvec = { default-features = false, version = "0.7" }
 async-trait = { default-features = false, version = "0.1" }
-cleu-orm-derive = { default-features = false, optional = true, path = "../cleu-orm-derive" }
+cleu-orm-derive = { default-features = false, optional = true, path = "../cleu-orm-derive", version = "0.1.0" }
 sqlx-core = { default-features = false, features = ["postgres", "runtime-tokio-native-tls"], version = "0.5" }
 
 [features]
@@ -9,7 +9,11 @@ default = []
 derive = ["cleu-orm-derive"]
 
 [package]
+authors = ["Caio Fernandes <c410.f3r@gmail.com>"]
+categories = ["database"]
+description = "Object–relational mapping"
 edition = "2021"
+keywords = ["database", "orm", "sql"]
+license = "Apache-2.0"
 name = "cleu-orm"
-publish = false
 version = "0.1.0"
