@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "cleu-orm",
+    "cleu-orm-derive"
+]

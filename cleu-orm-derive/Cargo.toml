@@ -1,0 +1,20 @@
+[dependencies]
+proc-macro2 = { default-features = false, version = "1.0" }
+quote = { default-features = false, version = "1.0" }
+syn = { default-features = false, version = "1.0" }
+
+[dev-dependencies]
+cleu-orm = { default-features = false, path = "../cleu-orm" }
+trybuild = { default-features = false, version = "1.0" }
+
+[features]
+default = []
+
+[lib]
+proc-macro = true
+
+[package]
+edition = "2021"
+name = "cleu-orm-derive"
+publish = false
+version = "0.1.0"

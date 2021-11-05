@@ -1,0 +1,15 @@
+[dependencies]
+arrayvec = { default-features = false, version = "0.7" }
+async-trait = { default-features = false, version = "0.1" }
+cleu-orm-derive = { default-features = false, optional = true, path = "../cleu-orm-derive" }
+sqlx-core = { default-features = false, features = ["postgres", "runtime-tokio-native-tls"], version = "0.5" }
+
+[features]
+default = []
+derive = ["cleu-orm-derive"]
+
+[package]
+edition = "2021"
+name = "cleu-orm"
+publish = false
+version = "0.1.0"
