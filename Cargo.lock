@@ -99,7 +99,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "cl-traits"
 version = "6.0.0"
-source = "git+https://github.com/c410-f3r/cl-traits#22065ac8e27220ed93a7ff8090fbb33824ea6291"
+source = "git+https://github.com/c410-f3r/cl-traits#569e20b5bf03709583622e6668fb9f58e5dba723"
 dependencies = [
  "arrayvec",
 ]
