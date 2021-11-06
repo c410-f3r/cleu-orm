@@ -5,6 +5,7 @@
 
 mod association;
 mod associations;
+mod buffer;
 mod crud;
 mod error;
 mod field;
@@ -21,6 +22,7 @@ mod utils;
 
 pub use association::*;
 pub use associations::*;
+pub use buffer::*;
 #[cfg(feature = "derive")]
 pub use cleu_orm_derive::*;
 pub use crud::*;

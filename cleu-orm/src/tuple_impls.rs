@@ -1,5 +1,6 @@
-use crate::{Association, Associations, Field, Fields, FullAssociation, SqlWriter, TableParams};
-use arrayvec::ArrayString;
+use crate::{
+  Association, Associations, Buffer, Field, Fields, FullAssociation, SqlWriter, TableParams,
+};
 use core::array;
 
 macro_rules! tuple_impls {
@@ -30,18 +31,19 @@ macro_rules! tuple_impls {
         }
       }
 
-      impl<ERR, $($T,)+ const N: usize> SqlWriter<N> for ($( ($T, Association), )+)
+      impl<BUFFER, ERR, $($T,)+> SqlWriter<BUFFER> for ($( ($T, Association), )+)
       where
+        BUFFER: Buffer,
         ERR: From<crate::Error>,
         $(
           $T: TableParams<Error = ERR>,
-          $T::Associations: SqlWriter<N, Error = ERR>,
+          $T::Associations: SqlWriter<BUFFER, Error = ERR>,
         )+
       {
         type Error = ERR;
 
         #[inline]
-        fn write_select(&self, buffer: &mut ArrayString<N>, where_str: &str) -> Result<(), Self::Error> {
+        fn write_select(&self, buffer: &mut BUFFER, where_str: &str) -> Result<(), Self::Error> {
           $(
             self.$idx.0.write_select(buffer, where_str)?;
           )+
@@ -51,7 +53,7 @@ macro_rules! tuple_impls {
         #[inline]
         fn write_select_associations(
           &self,
-            buffer: &mut ArrayString<N>,
+            buffer: &mut BUFFER,
         ) -> Result<(), Self::Error> {
           $(
             self.$idx.0.write_select_associations(buffer)?;
@@ -62,7 +64,7 @@ macro_rules! tuple_impls {
         #[inline]
         fn write_select_fields(
           &self,
-            buffer: &mut ArrayString<N>,
+            buffer: &mut BUFFER,
         ) -> Result<(), Self::Error> {
           $(
             self.$idx.0.write_select_fields(buffer)?;
@@ -71,7 +73,7 @@ macro_rules! tuple_impls {
         }
 
         #[inline]
-        fn write_select_orders_by(&self, buffer: &mut ArrayString<N>) -> Result<(), Self::Error> {
+        fn write_select_orders_by(&self, buffer: &mut BUFFER) -> Result<(), Self::Error> {
           $(
             self.$idx.0.write_select_orders_by(buffer)?;
           )+

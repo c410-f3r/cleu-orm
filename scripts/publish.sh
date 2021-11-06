@@ -3,8 +3,8 @@
 . "$(dirname "$0")/common.sh" --source-only
 
 PACKAGES=(
-    cleu-orm
     cleu-orm-derive
+    cleu-orm
 )
 
 for package in "${PACKAGES[@]}"; do

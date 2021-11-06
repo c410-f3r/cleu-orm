@@ -1,5 +1,6 @@
 [dependencies]
 arrayvec = { default-features = false, version = "0.7" }
+cl-traits = { default-features = false, features = ["alloc", "with-arrayvec"], git = "https://github.com/c410-f3r/cl-traits" }
 async-trait = { default-features = false, version = "0.1" }
 cleu-orm-derive = { default-features = false, optional = true, path = "../cleu-orm-derive", version = "0.1.0" }
 sqlx-core = { default-features = false, features = ["postgres", "runtime-tokio-native-tls"], version = "0.5" }

@@ -1,41 +1,44 @@
 use crate::{
-  buffer_try_push, buffer_try_push_str, buffer_write_fmt, write_select_field, write_select_join,
-  write_select_order_by, Associations, Fields, TableParams,
+  buffer_try_push_str, buffer_write_fmt, write_select_field, write_select_join,
+  write_select_order_by, Associations, Buffer, Fields, TableParams,
 };
-use arrayvec::ArrayString;
 
 /// Writes raw SQL commands
-pub trait SqlWriter<const N: usize> {
+pub trait SqlWriter<B>
+where
+  B: Buffer,
+{
   /// See [crate::Error].
   type Error: From<crate::Error>;
 
   /// Writes an entire SELECT command
-  fn write_select(&self, buffer: &mut ArrayString<N>, where_str: &str) -> Result<(), Self::Error>;
+  fn write_select(&self, buffer: &mut B, where_str: &str) -> Result<(), Self::Error>;
 
   /// Only writes JOIN commands that belong to SELECT
-  fn write_select_associations(&self, buffer: &mut ArrayString<N>) -> Result<(), Self::Error>;
+  fn write_select_associations(&self, buffer: &mut B) -> Result<(), Self::Error>;
 
   /// Only writes querying fields that belong to SELECT
-  fn write_select_fields(&self, buffer: &mut ArrayString<N>) -> Result<(), Self::Error>;
+  fn write_select_fields(&self, buffer: &mut B) -> Result<(), Self::Error>;
 
   /// Only writes ORDER BY commands that belong to SELECT
-  fn write_select_orders_by(&self, buffer: &mut ArrayString<N>) -> Result<(), Self::Error>;
+  fn write_select_orders_by(&self, buffer: &mut B) -> Result<(), Self::Error>;
 }
 
-impl<E, T, const N: usize> SqlWriter<N> for T
+impl<B, E, T> SqlWriter<B> for T
 where
+  B: Buffer,
   E: From<crate::Error>,
   T: TableParams<Error = E>,
-  T::Associations: SqlWriter<N, Error = E>,
+  T::Associations: SqlWriter<B, Error = E>,
 {
   type Error = E;
 
   #[inline]
-  fn write_select(&self, buffer: &mut ArrayString<N>, where_str: &str) -> Result<(), Self::Error> {
+  fn write_select(&self, buffer: &mut B, where_str: &str) -> Result<(), Self::Error> {
     buffer_try_push_str(buffer, "SELECT ")?;
     self.write_select_fields(buffer)?;
-    if buffer.ends_with(',') {
-      buffer.truncate(buffer.len().wrapping_sub(1))
+    if buffer.as_ref().ends_with(',') {
+      buffer.truncate(buffer.as_ref().len().wrapping_sub(1))
     }
     buffer_write_fmt(
       buffer,
@@ -49,24 +52,24 @@ where
     buffer_try_push_str(buffer, where_str)?;
     buffer_try_push_str(buffer, " ORDER BY ")?;
     self.write_select_orders_by(buffer)?;
-    if buffer.ends_with(',') {
-      buffer.truncate(buffer.len().wrapping_sub(1))
+    if buffer.as_ref().ends_with(',') {
+      buffer.truncate(buffer.as_ref().len().wrapping_sub(1))
     }
     Ok(())
   }
 
   #[inline]
-  fn write_select_associations(&self, buffer: &mut ArrayString<N>) -> Result<(), Self::Error> {
+  fn write_select_associations(&self, buffer: &mut B) -> Result<(), Self::Error> {
     for full_association in self.associations().full_associations() {
       write_select_join(buffer, Self::table_name(), self.suffix(), full_association)?;
-      buffer_try_push(buffer, ' ')?;
+      buffer_try_push_str(buffer, " ")?;
     }
     self.associations().write_select_associations(buffer)?;
     Ok(())
   }
 
   #[inline]
-  fn write_select_fields(&self, buffer: &mut ArrayString<N>) -> Result<(), Self::Error> {
+  fn write_select_fields(&self, buffer: &mut B) -> Result<(), Self::Error> {
     for field in self.fields().field_names() {
       write_select_field(
         buffer,
@@ -75,14 +78,14 @@ where
         self.suffix(),
         field,
       )?;
-      buffer_try_push(buffer, ',')?;
+      buffer_try_push_str(buffer, ",")?;
     }
     self.associations().write_select_fields(buffer)?;
     Ok(())
   }
 
   #[inline]
-  fn write_select_orders_by(&self, buffer: &mut ArrayString<N>) -> Result<(), Self::Error> {
+  fn write_select_orders_by(&self, buffer: &mut B) -> Result<(), Self::Error> {
     write_select_order_by(
       buffer,
       Self::table_name(),
@@ -90,7 +93,7 @@ where
       self.suffix(),
       self.id_field(),
     )?;
-    buffer_try_push(buffer, ',')?;
+    buffer_try_push_str(buffer, ",")?;
     //for _ in  self.associations().full_associations() {
     //  write_select_order_by(buffer, Self::table_name(), Self::alias(), self.suffix(), self.id_field())?;
     //  buffer_try_push(buffer, ',')?;

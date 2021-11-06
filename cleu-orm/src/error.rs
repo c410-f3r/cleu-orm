@@ -7,11 +7,13 @@ use core::fmt;
 pub enum Error {
   /// Insufficient capacity
   CapacityError(arrayvec::CapacityError),
+  /// Errors of the `cl-traits` crate
+  ClTraits(cl_traits::Error),
   /// Couldn't be a string
   Fmt(fmt::Error),
   /// No row was returned by the database
   NoDatabaseRowResult,
-  /// All SQL-related errors
+  /// Errors of the `sqlx_core` crate
   Sqlx(sqlx_core::error::Error),
 }
 
@@ -24,6 +26,13 @@ impl<T> From<arrayvec::CapacityError<T>> for Error {
   #[inline]
   fn from(_: arrayvec::CapacityError<T>) -> Self {
     Self::CapacityError(arrayvec::CapacityError::new(()))
+  }
+}
+
+impl From<cl_traits::Error> for Error {
+  #[inline]
+  fn from(from: cl_traits::Error) -> Self {
+    Self::ClTraits(from)
   }
 }
 

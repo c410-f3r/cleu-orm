@@ -1,7 +1,7 @@
-use crate::{FromRowsSuffix, FullAssociation, SqlWriter, TableParams};
+use crate::{Buffer, FromRowsSuffix, FullAssociation, SqlWriter, TableParams};
 use arrayvec::ArrayString;
 use core::{
-  fmt::{self, Arguments, Write},
+  fmt::{self, Arguments},
   marker::Unpin,
 };
 use sqlx_core::{
@@ -12,37 +12,39 @@ use sqlx_core::{
 
 /// Auxiliary method that gets all stored entities.
 #[inline]
-pub async fn read_all<R, T, const N: usize>(
-  buffer: &mut ArrayString<N>,
+pub async fn read_all<B, R, T>(
+  buffer: &mut B,
   table_params: &T,
   pool: &PgPool,
 ) -> Result<Vec<R>, T::Error>
 where
-  R: FromRowsSuffix<N, Error = T::Error> + Send + Unpin,
+  B: Buffer,
+  R: FromRowsSuffix<B, Error = T::Error> + Send + Unpin,
   T: TableParams,
-  T::Associations: SqlWriter<N, Error = T::Error>,
+  T::Associations: SqlWriter<B, Error = T::Error>,
   T::Error: From<crate::Error>,
 {
   table_params.write_select(buffer, "")?;
-  let rows = query(buffer.as_str()).fetch_all(pool).await.map_err(|err| err.into())?;
+  let rows = query(buffer.as_ref()).fetch_all(pool).await.map_err(|err| err.into())?;
   buffer.clear();
   collect_entities_tables(buffer, &rows, table_params)
 }
 
 /// Auxiliary method that only gets a single entity based on its id.
 #[inline]
-pub async fn read_by_id<F, T, const N: usize>(
-  buffer: &mut ArrayString<N>,
+pub async fn read_by_id<B, F, T>(
+  buffer: &mut B,
   id: F,
   pool: &PgPool,
   table_params: &T,
 ) -> Result<T::Table, T::Error>
 where
+  B: Buffer,
   F: fmt::Display,
   T: TableParams,
-  T::Associations: SqlWriter<N, Error = T::Error>,
+  T::Associations: SqlWriter<B, Error = T::Error>,
   T::Error: From<crate::Error>,
-  T::Table: FromRowsSuffix<N, Error = T::Error> + Send + Unpin,
+  T::Table: FromRowsSuffix<B, Error = T::Error> + Send + Unpin,
 {
   let where_str_rslt = ArrayString::<128>::try_from(format_args!(
     " WHERE \"{table}{suffix}\".{id_name} = {id_value}",
@@ -52,7 +54,7 @@ where
     suffix = table_params.suffix()
   ));
   table_params.write_select(buffer, where_str_rslt.map_err(|err| err.into())?.as_str())?;
-  let rows = query(buffer.as_str()).fetch_all(pool).await.map_err(|err| err.into())?;
+  let rows = query(buffer.as_ref()).fetch_all(pool).await.map_err(|err| err.into())?;
   buffer.clear();
   let first_row = rows.first().ok_or(crate::Error::NoDatabaseRowResult)?;
   Ok(T::Table::from_rows_suffix(&rows, buffer, table_params.suffix(), first_row)?.1)
@@ -60,15 +62,16 @@ where
 
 /// Only seeks all rows related to the `T` entity and stops as soon as the primary key changes.
 #[inline]
-pub fn seek_entity_tables<R, T, const N: usize>(
-  buffer: &mut ArrayString<N>,
+pub fn seek_entity_tables<B, R, T>(
+  buffer: &mut B,
   rows: &[PgRow],
   table_params: &T,
   mut cb: impl FnMut(R) -> Result<(), T::Error>,
 ) -> Result<usize, T::Error>
 where
+  B: Buffer,
   T: TableParams,
-  R: FromRowsSuffix<N, Error = T::Error>,
+  R: FromRowsSuffix<B, Error = T::Error>,
 {
   let mut counter: usize = 0;
 
@@ -86,7 +89,7 @@ where
 
   if let Ok((skip, table)) = R::from_rows_suffix(rows, buffer, table_params.suffix(), first_row) {
     write_column_alias(buffer, T::table_name(), table_params.suffix(), table_params.id_field())?;
-    previous = first_row.try_get(buffer.as_str()).map_err(|err| err.into())?;
+    previous = first_row.try_get(buffer.as_ref()).map_err(|err| err.into())?;
     buffer.clear();
     cb(table)?;
     counter = counter.wrapping_add(skip);
@@ -114,7 +117,7 @@ where
 
     if let Ok((skip, table)) = table_rslt {
       write_column_alias(buffer, T::table_name(), table_params.suffix(), table_params.id_field())?;
-      let curr: i64 = row.try_get(buffer.as_str()).map_err(|err| err.into())?;
+      let curr: i64 = row.try_get(buffer.as_ref()).map_err(|err| err.into())?;
       buffer.clear();
       if previous == curr {
         cb(table)?;
@@ -131,12 +134,15 @@ where
 
 /// Writes {table}{suffix}__{field}` into a buffer.
 #[inline]
-pub fn write_column_alias<const N: usize>(
-  buffer: &mut ArrayString<N>,
+pub fn write_column_alias<B>(
+  buffer: &mut B,
   table: &str,
   suffix: u8,
   field: &str,
-) -> crate::Result<()> {
+) -> crate::Result<()>
+where
+  B: Buffer,
+{
   buffer.write_fmt(format_args!(
     "{table}{suffix}__{field}",
     field = field,
@@ -147,46 +153,34 @@ pub fn write_column_alias<const N: usize>(
 }
 
 #[inline]
-pub(crate) fn buffer_try_push<E, const N: usize>(
-  buffer: &mut ArrayString<N>,
-  char: char,
-) -> Result<(), E>
+pub(crate) fn buffer_try_push_str<B, E>(buffer: &mut B, string: &str) -> Result<(), E>
 where
+  B: Buffer,
   E: From<crate::Error>,
 {
-  buffer.try_push(char).map_err(|err| E::from(err.into()))
+  buffer.push(string).map_err(|err| E::from(err.into()))
 }
 
 #[inline]
-pub(crate) fn buffer_try_push_str<E, const N: usize>(
-  buffer: &mut ArrayString<N>,
-  string: &str,
-) -> Result<(), E>
+pub(crate) fn buffer_write_fmt<B, E>(buffer: &mut B, args: Arguments<'_>) -> Result<(), E>
 where
-  E: From<crate::Error>,
-{
-  buffer.try_push_str(string).map_err(|err| E::from(err.into()))
-}
-
-#[inline]
-pub(crate) fn buffer_write_fmt<E, const N: usize>(
-  buffer: &mut ArrayString<N>,
-  args: Arguments<'_>,
-) -> Result<(), E>
-where
+  B: Buffer,
   E: From<crate::Error>,
 {
   buffer.write_fmt(args).map_err(|err| E::from(err.into()))
 }
 
 #[inline]
-pub(crate) fn write_select_field<const N: usize>(
-  buffer: &mut ArrayString<N>,
+pub(crate) fn write_select_field<B>(
+  buffer: &mut B,
   table: &str,
   table_alias: Option<&str>,
   suffix: u8,
   field: &str,
-) -> crate::Result<()> {
+) -> crate::Result<()>
+where
+  B: Buffer,
+{
   let actual_table = table_alias.unwrap_or(table);
   buffer.write_fmt(format_args!(
     "\"{actual_table}{suffix}\".{field} AS {actual_table}{suffix}__{field}",
@@ -198,12 +192,15 @@ pub(crate) fn write_select_field<const N: usize>(
 }
 
 #[inline]
-pub(crate) fn write_select_join<const N: usize>(
-  buffer: &mut ArrayString<N>,
+pub(crate) fn write_select_join<B>(
+  buffer: &mut B,
   from_table: &str,
   from_table_suffix: u8,
   full_association: FullAssociation<'_>,
-) -> crate::Result<()> {
+) -> crate::Result<()>
+where
+  B: Buffer,
+{
   let association = full_association.association();
   buffer.write_fmt(format_args!(
     "LEFT JOIN \"{table_relationship}\" AS \"{table_relationship_alias}{to_table_suffix}\" ON \
@@ -222,13 +219,16 @@ pub(crate) fn write_select_join<const N: usize>(
 }
 
 #[inline]
-pub(crate) fn write_select_order_by<const N: usize>(
-  buffer: &mut ArrayString<N>,
+pub(crate) fn write_select_order_by<B>(
+  buffer: &mut B,
   table: &str,
   table_alias: Option<&str>,
   suffix: u8,
   field: &str,
-) -> crate::Result<()> {
+) -> crate::Result<()>
+where
+  B: Buffer,
+{
   let actual_table = table_alias.unwrap_or(table);
   buffer.write_fmt(format_args!(
     "\"{actual_table}{suffix}\".{field}",
@@ -243,13 +243,14 @@ pub(crate) fn write_select_order_by<const N: usize>(
 ///
 /// One entity can constructed by more than one row.
 #[inline]
-fn collect_entities_tables<T, R, const N: usize>(
-  buffer: &mut ArrayString<N>,
+fn collect_entities_tables<B, T, R>(
+  buffer: &mut B,
   rows: &[PgRow],
   table_params: &T,
 ) -> Result<Vec<R>, T::Error>
 where
-  R: FromRowsSuffix<N, Error = T::Error>,
+  B: Buffer,
+  R: FromRowsSuffix<B, Error = T::Error>,
   T: TableParams,
 {
   let mut rslt = Vec::new();

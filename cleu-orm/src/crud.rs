@@ -1,22 +1,18 @@
-use crate::{read_all, read_by_id, FromRowsSuffix, SqlWriter, TableParams};
-use arrayvec::ArrayString;
+use crate::{read_all, read_by_id, Buffer, FromRowsSuffix, SqlWriter, TableParams};
 use core::fmt;
 use sqlx_core::postgres::PgPool;
 
 /// Create, read, update and delete SQL operations
 #[async_trait::async_trait]
-pub trait Crud<const N: usize>: TableParams + Sized
+pub trait Crud<B>: TableParams + Sized
 where
-  Self::Table: FromRowsSuffix<N, Error = Self::Error> + Send + Unpin,
-  Self::Associations: SqlWriter<N, Error = Self::Error>,
+  B: Buffer + Send + Sync,
+  Self::Table: FromRowsSuffix<B, Error = Self::Error> + Send + Unpin,
+  Self::Associations: SqlWriter<B, Error = Self::Error>,
 {
   /// Gets all stored entities.
   #[inline]
-  async fn read_all(
-    &self,
-    buffer: &mut ArrayString<N>,
-    pool: &PgPool,
-  ) -> Result<Vec<Self::Table>, Self::Error> {
+  async fn read_all(&self, buffer: &mut B, pool: &PgPool) -> Result<Vec<Self::Table>, Self::Error> {
     Ok(read_all(buffer, self, pool).await?)
   }
 
@@ -24,7 +20,7 @@ where
   #[inline]
   async fn read_by_id<F>(
     &self,
-    buffer: &mut ArrayString<N>,
+    buffer: &mut B,
     id: F,
     pool: &PgPool,
   ) -> Result<Self::Table, Self::Error>
@@ -36,10 +32,11 @@ where
 }
 
 #[async_trait::async_trait]
-impl<T, const N: usize> Crud<N> for T
+impl<B, T> Crud<B> for T
 where
+  B: Buffer + Send + Sync,
   T: TableParams,
-  T::Table: FromRowsSuffix<N, Error = T::Error> + Send + Unpin,
-  T::Associations: SqlWriter<N, Error = Self::Error>,
+  T::Table: FromRowsSuffix<B, Error = T::Error> + Send + Unpin,
+  T::Associations: SqlWriter<B, Error = Self::Error>,
 {
 }

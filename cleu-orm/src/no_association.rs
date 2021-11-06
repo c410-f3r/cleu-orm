@@ -1,7 +1,5 @@
-use arrayvec::ArrayString;
+use crate::{Associations, Buffer, FullAssociation, SqlWriter};
 use core::{array, marker::PhantomData};
-
-use crate::{Associations, FullAssociation, SqlWriter};
 
 /// For entities that don't have associations
 #[derive(Debug)]
@@ -24,29 +22,30 @@ impl<E> Associations for (NoAssociation<E>,) {
   }
 }
 
-impl<E, const N: usize> SqlWriter<N> for (NoAssociation<E>,)
+impl<B, E> SqlWriter<B> for (NoAssociation<E>,)
 where
+  B: Buffer,
   E: From<crate::Error>,
 {
   type Error = E;
 
   #[inline]
-  fn write_select(&self, _: &mut ArrayString<N>, _: &str) -> Result<(), Self::Error> {
+  fn write_select(&self, _: &mut B, _: &str) -> Result<(), Self::Error> {
     Ok(())
   }
 
   #[inline]
-  fn write_select_associations(&self, _: &mut ArrayString<N>) -> Result<(), Self::Error> {
+  fn write_select_associations(&self, _: &mut B) -> Result<(), Self::Error> {
     Ok(())
   }
 
   #[inline]
-  fn write_select_fields(&self, _: &mut ArrayString<N>) -> Result<(), Self::Error> {
+  fn write_select_fields(&self, _: &mut B) -> Result<(), Self::Error> {
     Ok(())
   }
 
   #[inline]
-  fn write_select_orders_by(&self, _: &mut ArrayString<N>) -> Result<(), Self::Error> {
+  fn write_select_orders_by(&self, _: &mut B) -> Result<(), Self::Error> {
     Ok(())
   }
 }

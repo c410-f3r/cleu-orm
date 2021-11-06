@@ -4,7 +4,6 @@
 //          |--> D
 
 use crate::{Association, Field, NoAssociation, SqlWriter, TableParams};
-use arrayvec::ArrayString;
 
 #[derive(Debug)]
 struct A {
@@ -188,7 +187,7 @@ impl TableParams for DParams {
 
 #[test]
 fn multi_referred_table_has_correct_select_query() {
-  let mut buffer = ArrayString::<512>::new();
+  let mut buffer = String::new();
   let d = DParams::new(0);
   d.write_select(&mut buffer, "").unwrap();
   assert_eq!(
@@ -199,7 +198,7 @@ fn multi_referred_table_has_correct_select_query() {
 
 #[test]
 fn referred_table_has_correct_select_query() {
-  let mut buffer = ArrayString::<256>::new();
+  let mut buffer = String::new();
   let b = BParams::new(0);
   b.write_select(&mut buffer, "").unwrap();
   assert_eq!(
@@ -210,7 +209,7 @@ fn referred_table_has_correct_select_query() {
 
 #[test]
 fn standalone_table_has_correct_select_query() {
-  let mut buffer = ArrayString::<256>::new();
+  let mut buffer = String::new();
   let a = AParams::new(0);
   a.write_select(&mut buffer, "").unwrap();
   assert_eq!(
