@@ -1,6 +1,5 @@
 //! # Cleu ORM
 
-#![allow(clippy::shadow_same)]
 #![feature(generic_associated_types)]
 
 mod association;

@@ -14,7 +14,7 @@ macro_rules! tuple_impls {
       where
         ERR: From<crate::Error>
       {
-        type FullAssociations<'x> = array::IntoIter<FullAssociation<'x>, $tuple_len>;
+        type FullAssociations<'x> where $($T: 'x,)+ = array::IntoIter<FullAssociation<'x>, $tuple_len>;
 
         #[inline]
         fn full_associations<'a>(&'a self) -> Self::FullAssociations<'a> {
@@ -43,9 +43,13 @@ macro_rules! tuple_impls {
         type Error = ERR;
 
         #[inline]
-        fn write_select(&self, buffer: &mut BUFFER, where_str: &str) -> Result<(), Self::Error> {
+        fn write_select(
+          &self,
+          buffer: &mut BUFFER,
+          where_cb: impl FnMut(&mut BUFFER) -> Result<(), Self::Error> + Clone,
+        ) -> Result<(), Self::Error> {
           $(
-            self.$idx.0.write_select(buffer, where_str)?;
+            self.$idx.0.write_select(buffer, where_cb.clone())?;
           )+
           Ok(())
         }

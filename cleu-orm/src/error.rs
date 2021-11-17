@@ -5,8 +5,6 @@ use core::fmt;
 /// Downstream crates should implement `From` to compose more custom errors.
 #[derive(Debug)]
 pub enum Error {
-  /// Insufficient capacity
-  CapacityError(arrayvec::CapacityError),
   /// Errors of the `cl-traits` crate
   ClTraits(cl_traits::Error),
   /// Couldn't be a string
@@ -20,13 +18,6 @@ pub enum Error {
 impl From<Error> for () {
   #[inline]
   fn from(_: Error) -> Self {}
-}
-
-impl<T> From<arrayvec::CapacityError<T>> for Error {
-  #[inline]
-  fn from(_: arrayvec::CapacityError<T>) -> Self {
-    Self::CapacityError(arrayvec::CapacityError::new(()))
-  }
 }
 
 impl From<cl_traits::Error> for Error {

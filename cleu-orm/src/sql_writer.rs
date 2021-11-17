@@ -12,7 +12,11 @@ where
   type Error: From<crate::Error>;
 
   /// Writes an entire SELECT command
-  fn write_select(&self, buffer: &mut B, where_str: &str) -> Result<(), Self::Error>;
+  fn write_select(
+    &self,
+    buffer: &mut B,
+    where_cb: impl FnMut(&mut B) -> Result<(), Self::Error> + Clone,
+  ) -> Result<(), Self::Error>;
 
   /// Only writes JOIN commands that belong to SELECT
   fn write_select_associations(&self, buffer: &mut B) -> Result<(), Self::Error>;
@@ -34,7 +38,11 @@ where
   type Error = E;
 
   #[inline]
-  fn write_select(&self, buffer: &mut B, where_str: &str) -> Result<(), Self::Error> {
+  fn write_select(
+    &self,
+    buffer: &mut B,
+    mut where_cb: impl FnMut(&mut B) -> Result<(), Self::Error> + Clone,
+  ) -> Result<(), Self::Error> {
     buffer_try_push_str(buffer, "SELECT ")?;
     self.write_select_fields(buffer)?;
     if buffer.as_ref().ends_with(',') {
@@ -49,7 +57,11 @@ where
       ),
     )?;
     self.write_select_associations(buffer)?;
-    buffer_try_push_str(buffer, where_str)?;
+    buffer_try_push_str(buffer, " WHERE ")?;
+    where_cb(buffer)?;
+    if buffer.as_ref().ends_with(" WHERE ") {
+      buffer.truncate(buffer.as_ref().len().wrapping_sub(7))
+    }
     buffer_try_push_str(buffer, " ORDER BY ")?;
     self.write_select_orders_by(buffer)?;
     if buffer.as_ref().ends_with(',') {
@@ -94,10 +106,6 @@ where
       self.id_field(),
     )?;
     buffer_try_push_str(buffer, ",")?;
-    //for _ in  self.associations().full_associations() {
-    //  write_select_order_by(buffer, Self::table_name(), Self::alias(), self.suffix(), self.id_field())?;
-    //  buffer_try_push(buffer, ',')?;
-    //}
     self.associations().write_select_orders_by(buffer)?;
     Ok(())
   }

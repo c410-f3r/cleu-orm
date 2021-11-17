@@ -1,5 +1,4 @@
 use crate::{Buffer, FromRowsSuffix, FullAssociation, SqlWriter, TableParams};
-use arrayvec::ArrayString;
 use core::{
   fmt::{self, Arguments},
   marker::Unpin,
@@ -10,12 +9,12 @@ use sqlx_core::{
   row::Row,
 };
 
-/// Auxiliary method that gets all stored entities.
+/// Auxiliary method that gets all stored entities filtered by a field.
 #[inline]
 pub async fn read_all<B, R, T>(
   buffer: &mut B,
-  table_params: &T,
   pool: &PgPool,
+  table_params: &T,
 ) -> Result<Vec<R>, T::Error>
 where
   B: Buffer,
@@ -24,7 +23,28 @@ where
   T::Associations: SqlWriter<B, Error = T::Error>,
   T::Error: From<crate::Error>,
 {
-  table_params.write_select(buffer, "")?;
+  table_params.write_select(buffer, |_| Ok(()))?;
+  let rows = query(buffer.as_ref()).fetch_all(pool).await.map_err(|err| err.into())?;
+  buffer.clear();
+  collect_entities_tables(buffer, &rows, table_params)
+}
+
+/// Auxiliary method that gets all stored entities filtered by a field.
+#[inline]
+pub async fn read_all_with_where<B, R, T>(
+  buffer: &mut B,
+  pool: &PgPool,
+  table_params: &T,
+  where_str: &str,
+) -> Result<Vec<R>, T::Error>
+where
+  B: Buffer,
+  R: FromRowsSuffix<B, Error = T::Error> + Send + Unpin,
+  T: TableParams,
+  T::Associations: SqlWriter<B, Error = T::Error>,
+  T::Error: From<crate::Error>,
+{
+  table_params.write_select(buffer, |b| buffer_try_push_str(b, where_str))?;
   let rows = query(buffer.as_ref()).fetch_all(pool).await.map_err(|err| err.into())?;
   buffer.clear();
   collect_entities_tables(buffer, &rows, table_params)
@@ -46,14 +66,16 @@ where
   T::Error: From<crate::Error>,
   T::Table: FromRowsSuffix<B, Error = T::Error> + Send + Unpin,
 {
-  let where_str_rslt = ArrayString::<128>::try_from(format_args!(
-    " WHERE \"{table}{suffix}\".{id_name} = {id_value}",
-    id_name = table_params.id_field(),
-    id_value = id,
-    table = T::table_name(),
-    suffix = table_params.suffix()
-  ));
-  table_params.write_select(buffer, where_str_rslt.map_err(|err| err.into())?.as_str())?;
+  table_params.write_select(buffer, |b| {
+    write_table_field(
+      b,
+      T::table_name(),
+      T::table_name_alias(),
+      table_params.suffix(),
+      table_params.id_field(),
+    )?;
+    buffer_write_fmt(b, format_args!(" = {id}"))
+  })?;
   let rows = query(buffer.as_ref()).fetch_all(pool).await.map_err(|err| err.into())?;
   buffer.clear();
   let first_row = rows.first().ok_or(crate::Error::NoDatabaseRowResult)?;
@@ -73,18 +95,17 @@ where
   T: TableParams,
   R: FromRowsSuffix<B, Error = T::Error>,
 {
-  let mut counter: usize = 0;
-
-  if counter >= rows.len() {
-    return Ok(counter);
+  if rows.is_empty() {
+    return Ok(0);
   }
 
-  let first_row = if let Some(elem) = rows.get(counter) {
+  let first_row = if let Some(elem) = rows.first() {
     elem
   } else {
-    return Ok(counter);
+    return Ok(0);
   };
 
+  let mut counter: usize = 0;
   let mut previous: i64;
 
   if let Ok((skip, table)) = R::from_rows_suffix(rows, buffer, table_params.suffix(), first_row) {
@@ -94,7 +115,8 @@ where
     cb(table)?;
     counter = counter.wrapping_add(skip);
   } else {
-    return Ok(counter);
+    buffer.clear();
+    return Ok(1);
   }
 
   loop {
@@ -143,12 +165,7 @@ pub fn write_column_alias<B>(
 where
   B: Buffer,
 {
-  buffer.write_fmt(format_args!(
-    "{table}{suffix}__{field}",
-    field = field,
-    suffix = suffix,
-    table = table
-  ))?;
+  buffer.write_fmt(format_args!("{table}{suffix}__{field}",))?;
   Ok(())
 }
 
@@ -182,12 +199,8 @@ where
   B: Buffer,
 {
   let actual_table = table_alias.unwrap_or(table);
-  buffer.write_fmt(format_args!(
-    "\"{actual_table}{suffix}\".{field} AS {actual_table}{suffix}__{field}",
-    field = field,
-    suffix = suffix,
-    actual_table = actual_table
-  ))?;
+  write_table_field(buffer, table, table_alias, suffix, field)?;
+  buffer.write_fmt(format_args!(" AS {actual_table}{suffix}__{field}"))?;
   Ok(())
 }
 
@@ -206,8 +219,6 @@ where
     "LEFT JOIN \"{table_relationship}\" AS \"{table_relationship_alias}{to_table_suffix}\" ON \
      \"{from_table}{from_table_suffix}\".{table_id} = \
      \"{table_relationship_alias}{to_table_suffix}\".{table_relationship_id}",
-    from_table = from_table,
-    from_table_suffix = from_table_suffix,
     table_id = association.from_id(),
     table_relationship = full_association.to_table(),
     table_relationship_alias =
@@ -230,12 +241,7 @@ where
   B: Buffer,
 {
   let actual_table = table_alias.unwrap_or(table);
-  buffer.write_fmt(format_args!(
-    "\"{actual_table}{suffix}\".{field}",
-    field = field,
-    suffix = suffix,
-    actual_table = actual_table
-  ))?;
+  buffer.write_fmt(format_args!("\"{actual_table}{suffix}\".{field}",))?;
   Ok(())
 }
 
@@ -269,4 +275,20 @@ where
   }
 
   Ok(rslt)
+}
+
+#[inline]
+pub(crate) fn write_table_field<B>(
+  buffer: &mut B,
+  table: &str,
+  table_alias: Option<&str>,
+  suffix: u8,
+  field: &str,
+) -> crate::Result<()>
+where
+  B: Buffer,
+{
+  let actual_table = table_alias.unwrap_or(table);
+  buffer.write_fmt(format_args!("\"{actual_table}{suffix}\".{field}"))?;
+  Ok(())
 }

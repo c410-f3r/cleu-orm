@@ -14,7 +14,10 @@ impl<E> NoAssociation<E> {
 }
 
 impl<E> Associations for (NoAssociation<E>,) {
-  type FullAssociations<'x> = array::IntoIter<FullAssociation<'x>, 0>;
+  type FullAssociations<'x>
+  where
+    E: 'x,
+  = array::IntoIter<FullAssociation<'x>, 0>;
 
   #[inline]
   fn full_associations(&self) -> Self::FullAssociations<'_> {
@@ -30,7 +33,11 @@ where
   type Error = E;
 
   #[inline]
-  fn write_select(&self, _: &mut B, _: &str) -> Result<(), Self::Error> {
+  fn write_select(
+    &self,
+    _: &mut B,
+    _: impl FnMut(&mut B) -> Result<(), Self::Error>,
+  ) -> Result<(), Self::Error> {
     Ok(())
   }
 

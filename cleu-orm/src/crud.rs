@@ -13,7 +13,7 @@ where
   /// Gets all stored entities.
   #[inline]
   async fn read_all(&self, buffer: &mut B, pool: &PgPool) -> Result<Vec<Self::Table>, Self::Error> {
-    Ok(read_all(buffer, self, pool).await?)
+    Ok(read_all(buffer, pool, self).await?)
   }
 
   /// Gets a single stored entity based on its id.
