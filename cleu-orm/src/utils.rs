@@ -1,13 +1,30 @@
-use crate::{Buffer, FromRowsSuffix, FullAssociation, SqlWriter, TableParams};
-use core::{
-  fmt::{self, Arguments},
-  marker::Unpin,
-};
+use crate::{Buffer, FromRowsSuffix, FullAssociation, SqlWriter, Suffix, TableParams};
+use core::fmt::Arguments;
 use sqlx_core::{
   postgres::{PgPool, PgRow},
   query::query,
   row::Row,
 };
+
+/// Shortcut of `buffer.try_push(...)`
+#[inline]
+pub fn buffer_try_push_str<B, E>(buffer: &mut B, string: &str) -> Result<(), E>
+where
+  B: Buffer,
+  E: From<crate::Error>,
+{
+  buffer.push(string).map_err(|err| E::from(err.into()))
+}
+
+/// Shortcut of `buffer.write_fmt(...)`
+#[inline]
+pub fn buffer_write_fmt<B, E>(buffer: &mut B, args: Arguments<'_>) -> Result<(), E>
+where
+  B: Buffer,
+  E: From<crate::Error>,
+{
+  buffer.write_fmt(args).map_err(|err| E::from(err.into()))
+}
 
 /// Auxiliary method that gets all stored entities filtered by a field.
 #[inline]
@@ -18,12 +35,12 @@ pub async fn read_all<B, R, T>(
 ) -> Result<Vec<R>, T::Error>
 where
   B: Buffer,
-  R: FromRowsSuffix<B, Error = T::Error> + Send + Unpin,
+  R: FromRowsSuffix<B, Error = T::Error>,
   T: TableParams,
   T::Associations: SqlWriter<B, Error = T::Error>,
   T::Error: From<crate::Error>,
 {
-  table_params.write_select(buffer, |_| Ok(()))?;
+  table_params.write_select(buffer, &mut |_| Ok(()))?;
   let rows = query(buffer.as_ref()).fetch_all(pool).await.map_err(|err| err.into())?;
   buffer.clear();
   collect_entities_tables(buffer, &rows, table_params)
@@ -39,12 +56,12 @@ pub async fn read_all_with_where<B, R, T>(
 ) -> Result<Vec<R>, T::Error>
 where
   B: Buffer,
-  R: FromRowsSuffix<B, Error = T::Error> + Send + Unpin,
+  R: FromRowsSuffix<B, Error = T::Error>,
   T: TableParams,
   T::Associations: SqlWriter<B, Error = T::Error>,
   T::Error: From<crate::Error>,
 {
-  table_params.write_select(buffer, |b| buffer_try_push_str(b, where_str))?;
+  table_params.write_select(buffer, &mut |b| buffer_try_push_str(b, where_str))?;
   let rows = query(buffer.as_ref()).fetch_all(pool).await.map_err(|err| err.into())?;
   buffer.clear();
   collect_entities_tables(buffer, &rows, table_params)
@@ -52,27 +69,26 @@ where
 
 /// Auxiliary method that only gets a single entity based on its id.
 #[inline]
-pub async fn read_by_id<B, F, T>(
+pub async fn read_by_id<B, T>(
   buffer: &mut B,
-  id: F,
+  id: &T::IdValue,
   pool: &PgPool,
   table_params: &T,
 ) -> Result<T::Table, T::Error>
 where
   B: Buffer,
-  F: fmt::Display,
   T: TableParams,
   T::Associations: SqlWriter<B, Error = T::Error>,
   T::Error: From<crate::Error>,
-  T::Table: FromRowsSuffix<B, Error = T::Error> + Send + Unpin,
+  T::Table: FromRowsSuffix<B, Error = T::Error>,
 {
-  table_params.write_select(buffer, |b| {
+  table_params.write_select(buffer, &mut |b| {
     write_table_field(
       b,
       T::table_name(),
       T::table_name_alias(),
       table_params.suffix(),
-      table_params.id_field(),
+      table_params.id_field().name(),
     )?;
     buffer_write_fmt(b, format_args!(" = {id}"))
   })?;
@@ -109,7 +125,12 @@ where
   let mut previous: i64;
 
   if let Ok((skip, table)) = R::from_rows_suffix(rows, buffer, table_params.suffix(), first_row) {
-    write_column_alias(buffer, T::table_name(), table_params.suffix(), table_params.id_field())?;
+    write_column_alias(
+      buffer,
+      T::table_name(),
+      table_params.suffix(),
+      table_params.id_field().name(),
+    )?;
     previous = first_row.try_get(buffer.as_ref()).map_err(|err| err.into())?;
     buffer.clear();
     cb(table)?;
@@ -130,25 +151,28 @@ where
       break;
     };
 
-    let table_rslt = R::from_rows_suffix(
+    let (skip, table) = R::from_rows_suffix(
       rows.get(counter..).unwrap_or_default(),
       buffer,
       table_params.suffix(),
       row,
-    );
+    )?;
 
-    if let Ok((skip, table)) = table_rslt {
-      write_column_alias(buffer, T::table_name(), table_params.suffix(), table_params.id_field())?;
-      let curr: i64 = row.try_get(buffer.as_ref()).map_err(|err| err.into())?;
-      buffer.clear();
-      if previous == curr {
-        cb(table)?;
-        counter = counter.wrapping_add(skip);
-      } else {
-        break;
-      }
-      previous = curr;
+    write_column_alias(
+      buffer,
+      T::table_name(),
+      table_params.suffix(),
+      table_params.id_field().name(),
+    )?;
+    let curr: i64 = row.try_get(buffer.as_ref()).map_err(|err| err.into())?;
+    buffer.clear();
+    if previous == curr {
+      cb(table)?;
+      counter = counter.wrapping_add(skip);
+    } else {
+      break;
     }
+    previous = curr;
   }
 
   Ok(counter)
@@ -159,7 +183,7 @@ where
 pub fn write_column_alias<B>(
   buffer: &mut B,
   table: &str,
-  suffix: u8,
+  suffix: Suffix,
   field: &str,
 ) -> crate::Result<()>
 where
@@ -170,29 +194,11 @@ where
 }
 
 #[inline]
-pub(crate) fn buffer_try_push_str<B, E>(buffer: &mut B, string: &str) -> Result<(), E>
-where
-  B: Buffer,
-  E: From<crate::Error>,
-{
-  buffer.push(string).map_err(|err| E::from(err.into()))
-}
-
-#[inline]
-pub(crate) fn buffer_write_fmt<B, E>(buffer: &mut B, args: Arguments<'_>) -> Result<(), E>
-where
-  B: Buffer,
-  E: From<crate::Error>,
-{
-  buffer.write_fmt(args).map_err(|err| E::from(err.into()))
-}
-
-#[inline]
 pub(crate) fn write_select_field<B>(
   buffer: &mut B,
   table: &str,
   table_alias: Option<&str>,
-  suffix: u8,
+  suffix: Suffix,
   field: &str,
 ) -> crate::Result<()>
 where
@@ -208,7 +214,7 @@ where
 pub(crate) fn write_select_join<B>(
   buffer: &mut B,
   from_table: &str,
-  from_table_suffix: u8,
+  from_table_suffix: Suffix,
   full_association: FullAssociation<'_>,
 ) -> crate::Result<()>
 where
@@ -234,7 +240,7 @@ pub(crate) fn write_select_order_by<B>(
   buffer: &mut B,
   table: &str,
   table_alias: Option<&str>,
-  suffix: u8,
+  suffix: Suffix,
   field: &str,
 ) -> crate::Result<()>
 where
@@ -282,7 +288,7 @@ pub(crate) fn write_table_field<B>(
   buffer: &mut B,
   table: &str,
   table_alias: Option<&str>,
-  suffix: u8,
+  suffix: Suffix,
   field: &str,
 ) -> crate::Result<()>
 where

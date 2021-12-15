@@ -11,6 +11,7 @@ export RUST_BACKTRACE=1
 export RUSTFLAGS="$($rt rust-flags -Aunstable_features,-Aunused_crate_dependencies)"
 
 $rt rustfmt
-$rt clippy -Aclippy::shadow_same
+$rt clippy
 
 rust-tools test-generic cleu-orm
+cargo test cleu-orm-derive

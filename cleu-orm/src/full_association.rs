@@ -1,4 +1,4 @@
-use crate::Association;
+use crate::{Association, Suffix};
 
 /// Contains [Association] plus some parameters gathered from other sources
 #[derive(Debug)]
@@ -6,7 +6,7 @@ pub struct FullAssociation<'a> {
   association: &'a Association,
   to_table: &'static str,
   to_table_alias: Option<&'static str>,
-  to_table_suffix: u8,
+  to_table_suffix: Suffix,
 }
 
 impl<'a> FullAssociation<'a> {
@@ -15,7 +15,7 @@ impl<'a> FullAssociation<'a> {
     association: &'a Association,
     to_table: &'static str,
     to_table_alias: Option<&'static str>,
-    to_table_suffix: u8,
+    to_table_suffix: Suffix,
   ) -> Self {
     Self { association, to_table, to_table_alias, to_table_suffix }
   }
@@ -40,7 +40,7 @@ impl<'a> FullAssociation<'a> {
 
   /// Referenced table suffix
   #[inline]
-  pub const fn to_table_suffix(&self) -> u8 {
+  pub const fn to_table_suffix(&self) -> Suffix {
     self.to_table_suffix
   }
 }

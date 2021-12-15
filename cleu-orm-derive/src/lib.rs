@@ -96,26 +96,23 @@ fn do_table_params(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
   let field_types = fields_without_attrs.map(|elem| &elem.ty);
 
   Ok(quote! {
-    #[automatically_derived]
     type #associations_ty_name = (
       #( #association_types, )*
     );
-    #[automatically_derived]
     type #fields_ty_name = (
-      #( cleu_orm::Field<#field_types>, )*
+      #( cleu_orm::Field<#error_ty, #field_types>, )*
     );
 
-    #[automatically_derived]
     pub struct #table_params_struct_name(
       #associations_ty_name,
       #fields_ty_name,
-      u8
+      cleu_orm::Suffix
     );
 
     #[automatically_derived]
     impl #table_params_struct_name {
       #[inline]
-      pub const fn new(suffix: u8) -> Self {
+      pub const fn new(suffix: cleu_orm::Suffix) -> Self {
         let mut incrementing_suffix = suffix;
         Self(
           (
@@ -134,6 +131,7 @@ fn do_table_params(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
       type Associations = #associations_ty_name;
       type Error = #error_ty;
       type Fields = #fields_ty_name;
+      type IdValue = i32;
       type Table = #table_struct_ty;
 
       #[inline]
@@ -142,17 +140,27 @@ fn do_table_params(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
       }
 
       #[inline]
+      fn associations_mut(&mut self) -> &mut Self::Associations {
+        &mut self.0
+      }
+
+      #[inline]
       fn fields(&self) -> &Self::Fields {
         &self.1
       }
 
       #[inline]
-      fn id_field(&self) -> &str {
-        self.1.0.name()
+      fn fields_mut(&mut self) -> &mut Self::Fields {
+        &mut self.1
       }
 
       #[inline]
-      fn suffix(&self) -> u8 {
+      fn id_field(&self) -> &cleu_orm::Field<#error_ty, i32> {
+        &self.1.0
+      }
+
+      #[inline]
+      fn suffix(&self) -> cleu_orm::Suffix {
         self.2
       }
 

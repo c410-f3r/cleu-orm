@@ -1,4 +1,4 @@
-use crate::Buffer;
+use crate::{Buffer, Suffix};
 use sqlx_core::postgres::PgRow;
 
 /// Constructs a single instance based on an arbitrary number of rows
@@ -13,7 +13,7 @@ where
   fn from_rows_suffix(
     all_rows: &[PgRow],
     buffer: &mut B,
-    suffix: u8,
+    suffix: Suffix,
     target_row: &PgRow,
   ) -> Result<(usize, Self), Self::Error>;
 }

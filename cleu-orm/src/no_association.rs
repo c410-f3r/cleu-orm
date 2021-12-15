@@ -1,4 +1,4 @@
-use crate::{Associations, Buffer, FullAssociation, SqlWriter};
+use crate::{Associations, Buffer, FullAssociation, SourceAssociation, SqlWriter, MAX_NODES_NUM};
 use core::{array, marker::PhantomData};
 
 /// For entities that don't have associations
@@ -33,10 +33,20 @@ where
   type Error = E;
 
   #[inline]
+  fn write_insert<'value, V>(
+    &self,
+    _: &mut [Option<&'static str>; MAX_NODES_NUM],
+    _: &mut B,
+    _: &mut Option<SourceAssociation<'value, V>>,
+  ) -> Result<(), Self::Error> {
+    Ok(())
+  }
+
+  #[inline]
   fn write_select(
     &self,
     _: &mut B,
-    _: impl FnMut(&mut B) -> Result<(), Self::Error>,
+    _: &mut impl FnMut(&mut B) -> Result<(), Self::Error>,
   ) -> Result<(), Self::Error> {
     Ok(())
   }

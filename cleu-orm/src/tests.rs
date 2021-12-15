@@ -1,1 +1,1 @@
-mod diamond_associations;
+mod generic;

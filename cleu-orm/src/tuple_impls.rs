@@ -1,7 +1,8 @@
 use crate::{
-  Association, Associations, Buffer, Field, Fields, FullAssociation, SqlWriter, TableParams,
+  buffer_try_push_str, Association, Associations, Buffer, Field, Fields, FullAssociation,
+  SourceAssociation, SqlValue, SqlWriter, TableParams, MAX_NODES_NUM,
 };
-use core::array;
+use core::{array, fmt};
 
 macro_rules! tuple_impls {
   ($(
@@ -43,14 +44,31 @@ macro_rules! tuple_impls {
         type Error = ERR;
 
         #[inline]
+        fn write_insert<'value, V>(
+          &self,
+          aux: &mut [Option<&'static str>; MAX_NODES_NUM],
+          buffer: &mut BUFFER,
+          source_association: &mut Option<SourceAssociation<'value, V>>
+        ) -> Result<(), Self::Error>
+        where
+          V: fmt::Display
+        {
+          $(
+            if let Some(ref mut elem) = source_association.as_mut() {
+              *elem.source_field_mut() = self.$idx.1.to_id();
+            }
+            self.$idx.0.write_insert(aux, buffer, source_association)?;
+          )+
+          Ok(())
+        }
+
+        #[inline]
         fn write_select(
           &self,
           buffer: &mut BUFFER,
-          where_cb: impl FnMut(&mut BUFFER) -> Result<(), Self::Error> + Clone,
+          where_cb: &mut impl FnMut(&mut BUFFER) -> Result<(), Self::Error>,
         ) -> Result<(), Self::Error> {
-          $(
-            self.$idx.0.write_select(buffer, where_cb.clone())?;
-          )+
+          $( self.$idx.0.write_select(buffer, where_cb)?; )+
           Ok(())
         }
 
@@ -59,9 +77,7 @@ macro_rules! tuple_impls {
           &self,
             buffer: &mut BUFFER,
         ) -> Result<(), Self::Error> {
-          $(
-            self.$idx.0.write_select_associations(buffer)?;
-          )+
+          $( self.$idx.0.write_select_associations(buffer)?; )+
           Ok(())
         }
 
@@ -70,27 +86,42 @@ macro_rules! tuple_impls {
           &self,
             buffer: &mut BUFFER,
         ) -> Result<(), Self::Error> {
-          $(
-            self.$idx.0.write_select_fields(buffer)?;
-          )+
+          $( self.$idx.0.write_select_fields(buffer)?; )+
           Ok(())
         }
 
         #[inline]
         fn write_select_orders_by(&self, buffer: &mut BUFFER) -> Result<(), Self::Error> {
-          $(
-            self.$idx.0.write_select_orders_by(buffer)?;
-          )+
+          $( self.$idx.0.write_select_orders_by(buffer)?; )+
           Ok(())
         }
       }
 
-      impl<$($T),+> Fields for ($( Field<$T>, )+) {
+      impl<ERR, $($T: SqlValue),+> Fields for ($( Field<ERR, $T>, )+)
+      where
+        ERR: From<crate::Error>
+      {
+        type Error = ERR;
         type FieldNames = array::IntoIter<&'static str, $tuple_len>;
 
         #[inline]
         fn field_names(&self) -> Self::FieldNames {
           [ $( self.$idx.name(), )+ ].into_iter()
+        }
+
+        #[inline]
+        fn write_table_values<BUFFER>(&self, buffer: &mut BUFFER) -> Result<(), Self::Error>
+        where
+          BUFFER: Buffer
+        {
+          $(
+            if let Some(ref elem) = *self.$idx.value() {
+              buffer_try_push_str(buffer, "'")?;
+              elem.write(buffer)?;
+              buffer_try_push_str(buffer, "',")?;
+            }
+          )+
+          Ok(())
         }
       }
     )+
