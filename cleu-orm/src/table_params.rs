@@ -55,7 +55,7 @@ pub trait TableParams {
   }
 }
 
-impl<'a, T> TableParams for &'a mut T
+impl<T> TableParams for &'_ mut T
 where
   T: TableParams,
 {

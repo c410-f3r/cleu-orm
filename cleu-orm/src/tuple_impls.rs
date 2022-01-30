@@ -1,5 +1,5 @@
 use crate::{
-  buffer_try_push_str, Association, Associations, Buffer, Field, Fields, FullAssociation,
+  buffer_try_push_str, Association, Associations, Field, Fields, FullAssociation,
   SourceAssociation, SqlValue, SqlWriter, TableParams, MAX_NODES_NUM,
 };
 use core::{array, fmt};
@@ -15,10 +15,12 @@ macro_rules! tuple_impls {
       where
         ERR: From<crate::Error>
       {
-        type FullAssociations<'x> where $($T: 'x,)+ = array::IntoIter<FullAssociation<'x>, $tuple_len>;
+        type FullAssociations<'full_associations>
+        where
+          $($T: 'full_associations,)+ = array::IntoIter<FullAssociation<'full_associations>, $tuple_len>;
 
         #[inline]
-        fn full_associations<'a>(&'a self) -> Self::FullAssociations<'a> {
+        fn full_associations<'this>(&'this self) -> Self::FullAssociations<'this> {
           [
             $(
               FullAssociation::new(
@@ -34,7 +36,7 @@ macro_rules! tuple_impls {
 
       impl<BUFFER, ERR, $($T,)+> SqlWriter<BUFFER> for ($( ($T, Association), )+)
       where
-        BUFFER: Buffer,
+        BUFFER: cl_traits::String,
         ERR: From<crate::Error>,
         $(
           $T: TableParams<Error = ERR>,
@@ -112,13 +114,12 @@ macro_rules! tuple_impls {
         #[inline]
         fn write_table_values<BUFFER>(&self, buffer: &mut BUFFER) -> Result<(), Self::Error>
         where
-          BUFFER: Buffer
+          BUFFER: cl_traits::String
         {
           $(
             if let Some(ref elem) = *self.$idx.value() {
-              buffer_try_push_str(buffer, "'")?;
               elem.write(buffer)?;
-              buffer_try_push_str(buffer, "',")?;
+              buffer_try_push_str(buffer, ",")?;
             }
           )+
           Ok(())

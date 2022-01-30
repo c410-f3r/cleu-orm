@@ -1,10 +1,12 @@
-use crate::{Buffer, Suffix};
+#![cfg(any(feature = "with-sqlx-postgres", feature = "with-sqlx-runtime-tokio-native-tls"))]
+
+use crate::Suffix;
 use sqlx_core::postgres::PgRow;
 
 /// Constructs a single instance based on an arbitrary number of rows
-pub trait FromRowsSuffix<B>: Sized
+pub trait FromRowsSuffix<S>: Sized
 where
-  B: Buffer,
+  S: cl_traits::String,
 {
   /// See [crate::Error]
   type Error: From<crate::Error>;
@@ -12,7 +14,7 @@ where
   /// See [FromRowsSuffix].
   fn from_rows_suffix(
     all_rows: &[PgRow],
-    buffer: &mut B,
+    buffer: &mut S,
     suffix: Suffix,
     target_row: &PgRow,
   ) -> Result<(usize, Self), Self::Error>;

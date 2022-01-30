@@ -1,4 +1,4 @@
-use crate::{Associations, Buffer, FullAssociation, SourceAssociation, SqlWriter, MAX_NODES_NUM};
+use crate::{Associations, FullAssociation, SourceAssociation, SqlWriter, MAX_NODES_NUM};
 use core::{array, marker::PhantomData};
 
 /// For entities that don't have associations
@@ -14,10 +14,10 @@ impl<E> NoAssociation<E> {
 }
 
 impl<E> Associations for (NoAssociation<E>,) {
-  type FullAssociations<'x>
+  type FullAssociations<'full_associations>
   where
-    E: 'x,
-  = array::IntoIter<FullAssociation<'x>, 0>;
+    E: 'full_associations,
+  = array::IntoIter<FullAssociation<'full_associations>, 0>;
 
   #[inline]
   fn full_associations(&self) -> Self::FullAssociations<'_> {
@@ -25,10 +25,10 @@ impl<E> Associations for (NoAssociation<E>,) {
   }
 }
 
-impl<B, E> SqlWriter<B> for (NoAssociation<E>,)
+impl<E, S> SqlWriter<S> for (NoAssociation<E>,)
 where
-  B: Buffer,
   E: From<crate::Error>,
+  S: cl_traits::String,
 {
   type Error = E;
 
@@ -36,7 +36,7 @@ where
   fn write_insert<'value, V>(
     &self,
     _: &mut [Option<&'static str>; MAX_NODES_NUM],
-    _: &mut B,
+    _: &mut S,
     _: &mut Option<SourceAssociation<'value, V>>,
   ) -> Result<(), Self::Error> {
     Ok(())
@@ -45,24 +45,24 @@ where
   #[inline]
   fn write_select(
     &self,
-    _: &mut B,
-    _: &mut impl FnMut(&mut B) -> Result<(), Self::Error>,
+    _: &mut S,
+    _: &mut impl FnMut(&mut S) -> Result<(), Self::Error>,
   ) -> Result<(), Self::Error> {
     Ok(())
   }
 
   #[inline]
-  fn write_select_associations(&self, _: &mut B) -> Result<(), Self::Error> {
+  fn write_select_associations(&self, _: &mut S) -> Result<(), Self::Error> {
     Ok(())
   }
 
   #[inline]
-  fn write_select_fields(&self, _: &mut B) -> Result<(), Self::Error> {
+  fn write_select_fields(&self, _: &mut S) -> Result<(), Self::Error> {
     Ok(())
   }
 
   #[inline]
-  fn write_select_orders_by(&self, _: &mut B) -> Result<(), Self::Error> {
+  fn write_select_orders_by(&self, _: &mut S) -> Result<(), Self::Error> {
     Ok(())
   }
 }

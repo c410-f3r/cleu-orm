@@ -2,17 +2,17 @@ use crate::{Association, Suffix};
 
 /// Contains [Association] plus some parameters gathered from other sources
 #[derive(Debug)]
-pub struct FullAssociation<'a> {
-  association: &'a Association,
+pub struct FullAssociation<'association> {
+  association: &'association Association,
   to_table: &'static str,
   to_table_alias: Option<&'static str>,
   to_table_suffix: Suffix,
 }
 
-impl<'a> FullAssociation<'a> {
+impl<'association> FullAssociation<'association> {
   #[inline]
   pub(crate) const fn new(
-    association: &'a Association,
+    association: &'association Association,
     to_table: &'static str,
     to_table_alias: Option<&'static str>,
     to_table_suffix: Suffix,
@@ -22,7 +22,7 @@ impl<'a> FullAssociation<'a> {
 
   /// See [Association].
   #[inline]
-  pub const fn association(&self) -> &&'a Association {
+  pub const fn association(&self) -> &&'association Association {
     &self.association
   }
 

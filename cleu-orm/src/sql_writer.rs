@@ -1,14 +1,13 @@
 use crate::{
   buffer_try_push_str, buffer_write_fmt, write_select_field, write_select_join,
-  write_select_order_by, Associations, Buffer, Fields, SourceAssociation, TableParams,
-  MAX_NODES_NUM,
+  write_select_order_by, Associations, Fields, SourceAssociation, TableParams, MAX_NODES_NUM,
 };
 use core::fmt;
 
 /// Writes raw SQL commands
-pub trait SqlWriter<B>
+pub trait SqlWriter<S>
 where
-  B: Buffer,
+  S: cl_traits::String,
 {
   /// See [crate::Error].
   type Error: From<crate::Error>;
@@ -17,7 +16,7 @@ where
   fn write_insert<'value, V>(
     &self,
     aux: &mut [Option<&'static str>; MAX_NODES_NUM],
-    buffer: &mut B,
+    buffer: &mut S,
     source_association: &mut Option<SourceAssociation<'value, V>>,
   ) -> Result<(), Self::Error>
   where
@@ -26,26 +25,26 @@ where
   /// Writes an entire SELECT command
   fn write_select(
     &self,
-    buffer: &mut B,
-    where_cb: &mut impl FnMut(&mut B) -> Result<(), Self::Error>,
+    buffer: &mut S,
+    where_cb: &mut impl FnMut(&mut S) -> Result<(), Self::Error>,
   ) -> Result<(), Self::Error>;
 
   /// Only writes JOIN commands that belong to SELECT
-  fn write_select_associations(&self, buffer: &mut B) -> Result<(), Self::Error>;
+  fn write_select_associations(&self, buffer: &mut S) -> Result<(), Self::Error>;
 
   /// Only writes querying fields that belong to SELECT
-  fn write_select_fields(&self, buffer: &mut B) -> Result<(), Self::Error>;
+  fn write_select_fields(&self, buffer: &mut S) -> Result<(), Self::Error>;
 
   /// Only writes ORDER BY commands that belong to SELECT
-  fn write_select_orders_by(&self, buffer: &mut B) -> Result<(), Self::Error>;
+  fn write_select_orders_by(&self, buffer: &mut S) -> Result<(), Self::Error>;
 }
 
-impl<B, E, T> SqlWriter<B> for T
+impl<E, S, T> SqlWriter<S> for T
 where
-  B: Buffer,
   E: From<crate::Error>,
+  S: cl_traits::String,
   T: TableParams<Error = E>,
-  T::Associations: SqlWriter<B, Error = E>,
+  T::Associations: SqlWriter<S, Error = E>,
 {
   type Error = E;
 
@@ -53,7 +52,7 @@ where
   fn write_insert<'value, V>(
     &self,
     aux: &mut [Option<&'static str>; MAX_NODES_NUM],
-    buffer: &mut B,
+    buffer: &mut S,
     source_association: &mut Option<SourceAssociation<'value, V>>,
   ) -> Result<(), Self::Error>
   where
@@ -113,8 +112,8 @@ where
     if let Some(ref elem) = *source_association {
       if elem.source_field() != self.id_field().name() {
         write!(
-          |local| { buffer_write_fmt(local, format_args!(",{}", elem.source_field())) },
-          |local| { buffer_write_fmt(local, format_args!("'{}',", elem.source_value())) }
+          |local| buffer_write_fmt(local, format_args!(",{}", elem.source_field())),
+          |local| buffer_write_fmt(local, format_args!("'{}',", elem.source_value()))
         );
         self.associations().write_insert(aux, buffer, &mut new_source_assocition)?;
         return Ok(());
@@ -128,8 +127,8 @@ where
   #[inline]
   fn write_select(
     &self,
-    buffer: &mut B,
-    where_cb: &mut impl FnMut(&mut B) -> Result<(), Self::Error>,
+    buffer: &mut S,
+    where_cb: &mut impl FnMut(&mut S) -> Result<(), Self::Error>,
   ) -> Result<(), Self::Error> {
     buffer_try_push_str(buffer, "SELECT ")?;
     self.write_select_fields(buffer)?;
@@ -159,7 +158,7 @@ where
   }
 
   #[inline]
-  fn write_select_associations(&self, buffer: &mut B) -> Result<(), Self::Error> {
+  fn write_select_associations(&self, buffer: &mut S) -> Result<(), Self::Error> {
     for full_association in self.associations().full_associations() {
       write_select_join(buffer, Self::table_name(), self.suffix(), full_association)?;
       buffer_try_push_str(buffer, " ")?;
@@ -169,7 +168,7 @@ where
   }
 
   #[inline]
-  fn write_select_fields(&self, buffer: &mut B) -> Result<(), Self::Error> {
+  fn write_select_fields(&self, buffer: &mut S) -> Result<(), Self::Error> {
     for field in self.fields().field_names() {
       write_select_field(
         buffer,
@@ -185,7 +184,7 @@ where
   }
 
   #[inline]
-  fn write_select_orders_by(&self, buffer: &mut B) -> Result<(), Self::Error> {
+  fn write_select_orders_by(&self, buffer: &mut S) -> Result<(), Self::Error> {
     write_select_order_by(
       buffer,
       Self::table_name(),

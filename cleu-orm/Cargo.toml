@@ -1,16 +1,18 @@
 [dependencies]
 arrayvec = { default-features = false, optional = true, version = "0.7" }
 async-trait = { default-features = false, version = "0.1" }
-cl-traits = { default-features = false, features = ["alloc"], git = "https://github.com/c410-f3r/cl-traits", version = "6.0" }
+cl-traits = { default-features = false, features = ["alloc", "gat"], git = "https://github.com/c410-f3r/cl-traits", version = "6.0" }
 cleu-orm-derive = { default-features = false, optional = true, path = "../cleu-orm-derive", version = "0.1.0" }
 rust_decimal = { default-features = false, optional = true, version = "1.0" }
-sqlx-core = { default-features = false, features = ["postgres", "runtime-tokio-native-tls"], version = "0.5" }
+sqlx-core = { default-features = false, optional = true, version = "0.5" }
 
 [features]
 default = []
 derive = ["cleu-orm-derive"]
 with-arrayvec = ["arrayvec", "cl-traits/with-arrayvec"]
 with-rust_decimal = ["rust_decimal"]
+with-sqlx-postgres = ["sqlx-core/postgres"]
+with-sqlx-runtime-tokio-native-tls = ["sqlx-core/runtime-tokio-rustls"]
 
 [package]
 authors = ["Caio Fernandes <c410.f3r@gmail.com>"]

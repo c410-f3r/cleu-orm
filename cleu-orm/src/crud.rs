@@ -1,22 +1,28 @@
+//! Operations for different types of databases
+
+#![cfg(any(feature = "with-sqlx-postgres", feature = "with-sqlx-runtime-tokio-native-tls"))]
+
+mod utils;
+
 use crate::{
-  read_all, read_by_id, Buffer, FromRowsSuffix, InitialInsertValue, SqlWriter, TableParams,
-  UpdateFieldValues, MAX_NODES_NUM,
+  FromRowsSuffix, InitialInsertValue, SqlWriter, TableParams, UpdateFieldValues, MAX_NODES_NUM,
 };
 use sqlx_core::{executor::Executor, postgres::PgPool};
+pub use utils::*;
 
 /// Create, read, update and delete SQL operations
 #[async_trait::async_trait]
-pub trait Crud<B>: TableParams + Sized
+pub trait Crud<S>: TableParams + Sized
 where
-  B: Buffer + Send + Sync,
-  Self::Table: FromRowsSuffix<B, Error = Self::Error> + Unpin,
-  Self::Associations: SqlWriter<B, Error = Self::Error>,
+  S: Send + cl_traits::String + Sync,
+  Self::Table: FromRowsSuffix<S, Error = Self::Error> + Unpin,
+  Self::Associations: SqlWriter<S, Error = Self::Error>,
 {
   /// Creates a new table on the database
   #[inline]
   async fn create<'table>(
     &mut self,
-    buffer: &mut B,
+    buffer: &mut S,
     pool: &PgPool,
     table: &'table Self::Table,
   ) -> Result<(), Self::Error>
@@ -36,7 +42,7 @@ where
 
   /// Gets all stored entities.
   #[inline]
-  async fn read_all(&self, buffer: &mut B, pool: &PgPool) -> Result<Vec<Self::Table>, Self::Error> {
+  async fn read_all(&self, buffer: &mut S, pool: &PgPool) -> Result<Vec<Self::Table>, Self::Error> {
     Ok(read_all(buffer, pool, self).await?)
   }
 
@@ -44,7 +50,7 @@ where
   #[inline]
   async fn read_by_id(
     &self,
-    buffer: &mut B,
+    buffer: &mut S,
     id: &Self::IdValue,
     pool: &PgPool,
   ) -> Result<Self::Table, Self::Error>
@@ -56,11 +62,11 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, T> Crud<B> for T
+impl<S, T> Crud<S> for T
 where
-  B: Buffer + Send + Sync,
+  S: cl_traits::String + Send + Sync,
   T: TableParams,
-  T::Table: FromRowsSuffix<B, Error = T::Error> + Unpin,
-  T::Associations: SqlWriter<B, Error = Self::Error>,
+  T::Table: FromRowsSuffix<S, Error = T::Error> + Unpin,
+  T::Associations: SqlWriter<S, Error = Self::Error>,
 {
 }
