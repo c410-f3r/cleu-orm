@@ -24,10 +24,10 @@ mod utils;
 
 pub use association::*;
 pub use associations::*;
+pub use cl_traits::String;
 #[cfg(feature = "derive")]
 pub use cleu_orm_derive::*;
 pub use error::*;
-pub use cl_traits::String;
 pub use field::*;
 pub use fields::*;
 #[cfg(any(feature = "with-sqlx-postgres", feature = "with-sqlx-runtime-tokio-native-tls"))]
