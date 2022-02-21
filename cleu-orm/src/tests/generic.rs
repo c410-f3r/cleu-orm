@@ -4,8 +4,8 @@
 //        |--> A
 
 use crate::{
-  Association, Field, InitialInsertValue, NoAssociation, SqlWriter, Suffix, TableParams,
-  UpdateFieldValues, MAX_NODES_NUM,
+  Association, Field, InitialInsertValue, Limit, NoAssociation, OrderBy, SqlWriter, Suffix,
+  TableParams, UpdateFieldValues, MAX_NODES_NUM,
 };
 
 const A: A = A { id: 1, name: "foo1" };
@@ -281,10 +281,10 @@ impl<'table> UpdateFieldValues<&'table D> for DParams<'table> {
 fn multi_referred_table_has_correct_statements() {
   let mut buffer = String::new();
   let mut d_params = DParams::new(0);
-  d_params.write_select(&mut buffer, &mut |_| Ok(())).unwrap();
+  d_params.write_select(&mut buffer, OrderBy::Ascending, Limit::All, &mut |_| Ok(())).unwrap();
   assert_eq!(
     &buffer,
-    r#"SELECT "d0".id AS d0__id,"d0".name AS d0__name,"b1".id AS b1__id,"b1".name AS b1__name,"a2".id AS a2__id,"a2".name AS a2__name,"c2".id AS c2__id,"c2".name AS c2__name,"a3".id AS a3__id,"a3".name AS a3__name FROM "d" AS "d0" LEFT JOIN "b" AS "b1" ON "d0".id = "b1".id_d LEFT JOIN "c" AS "c2" ON "d0".id = "c2".id_d LEFT JOIN "a" AS "a2" ON "b1".id = "a2".id_b LEFT JOIN "a" AS "a3" ON "c2".id = "a3".id_c  ORDER BY "d0".id,"b1".id,"a2".id,"c2".id,"a3".id"#
+    r#"SELECT "d0".id AS d0__id,"d0".name AS d0__name,"b1".id AS b1__id,"b1".name AS b1__name,"a2".id AS a2__id,"a2".name AS a2__name,"c2".id AS c2__id,"c2".name AS c2__name,"a3".id AS a3__id,"a3".name AS a3__name FROM "d" AS "d0" LEFT JOIN "b" AS "b1" ON "d0".id = "b1".id_d LEFT JOIN "c" AS "c2" ON "d0".id = "c2".id_d LEFT JOIN "a" AS "a2" ON "b1".id = "a2".id_b LEFT JOIN "a" AS "a3" ON "c2".id = "a3".id_c  ORDER BY "d0".id,"b1".id,"a2".id,"c2".id,"a3".id ASC LIMIT ALL"#
   );
   buffer.clear();
   d_params.update_field_values(&D);
@@ -305,10 +305,10 @@ fn multi_referred_table_has_correct_statements() {
 fn referred_table_has_correct_statements() {
   let mut buffer = String::new();
   let mut b_params = BParams::new(0);
-  b_params.write_select(&mut buffer, &mut |_| Ok(())).unwrap();
+  b_params.write_select(&mut buffer, OrderBy::Ascending, Limit::All, &mut |_| Ok(())).unwrap();
   assert_eq!(
     &buffer,
-    r#"SELECT "b0".id AS b0__id,"b0".name AS b0__name,"a1".id AS a1__id,"a1".name AS a1__name FROM "b" AS "b0" LEFT JOIN "a" AS "a1" ON "b0".id = "a1".id_b  ORDER BY "b0".id,"a1".id"#
+    r#"SELECT "b0".id AS b0__id,"b0".name AS b0__name,"a1".id AS a1__id,"a1".name AS a1__name FROM "b" AS "b0" LEFT JOIN "a" AS "a1" ON "b0".id = "a1".id_b  ORDER BY "b0".id,"a1".id ASC LIMIT ALL"#
   );
   buffer.clear();
   b_params.update_field_values(&B);
@@ -329,10 +329,10 @@ fn referred_table_has_correct_statements() {
 fn standalone_table_has_correct_statements() {
   let mut buffer = String::new();
   let mut a_params = AParams::new(0);
-  a_params.write_select(&mut buffer, &mut |_| Ok(())).unwrap();
+  a_params.write_select(&mut buffer, OrderBy::Ascending, Limit::All, &mut |_| Ok(())).unwrap();
   assert_eq!(
     &buffer,
-    r#"SELECT "a0".id AS a0__id,"a0".name AS a0__name FROM "a" AS "a0"  ORDER BY "a0".id"#
+    r#"SELECT "a0".id AS a0__id,"a0".name AS a0__name FROM "a" AS "a0"  ORDER BY "a0".id ASC LIMIT ALL"#
   );
   buffer.clear();
   a_params.update_field_values(&A);

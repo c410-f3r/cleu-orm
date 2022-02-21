@@ -1,4 +1,6 @@
-use crate::{Associations, FullAssociation, SourceAssociation, SqlWriter, MAX_NODES_NUM};
+use crate::{
+  Associations, FullAssociation, Limit, OrderBy, SourceAssociation, SqlWriter, MAX_NODES_NUM,
+};
 use core::{array, marker::PhantomData};
 
 /// For entities that don't have associations
@@ -46,6 +48,8 @@ where
   fn write_select(
     &self,
     _: &mut S,
+    _: OrderBy,
+    _: Limit,
     _: &mut impl FnMut(&mut S) -> Result<(), Self::Error>,
   ) -> Result<(), Self::Error> {
     Ok(())

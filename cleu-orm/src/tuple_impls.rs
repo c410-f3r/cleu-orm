@@ -1,5 +1,5 @@
 use crate::{
-  buffer_try_push_str, Association, Associations, Field, Fields, FullAssociation,
+  buffer_try_push_str, Association, Associations, Field, Fields, FullAssociation, Limit, OrderBy,
   SourceAssociation, SqlValue, SqlWriter, TableParams, MAX_NODES_NUM,
 };
 use core::{array, fmt};
@@ -68,9 +68,11 @@ macro_rules! tuple_impls {
         fn write_select(
           &self,
           buffer: &mut BUFFER,
+          order_by: OrderBy,
+          limit: Limit,
           where_cb: &mut impl FnMut(&mut BUFFER) -> Result<(), Self::Error>,
         ) -> Result<(), Self::Error> {
-          $( self.$idx.0.write_select(buffer, where_cb)?; )+
+          $( self.$idx.0.write_select(buffer, order_by, limit, where_cb)?; )+
           Ok(())
         }
 

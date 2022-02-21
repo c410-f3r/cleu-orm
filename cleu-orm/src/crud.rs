@@ -5,7 +5,8 @@
 mod utils;
 
 use crate::{
-  FromRowsSuffix, InitialInsertValue, SqlWriter, TableParams, UpdateFieldValues, MAX_NODES_NUM,
+  FromRowsSuffix, InitialInsertValue, Limit, OrderBy, SqlWriter, TableParams, UpdateFieldValues,
+  MAX_NODES_NUM,
 };
 use sqlx_core::{executor::Executor, postgres::PgPool};
 pub use utils::*;
@@ -58,6 +59,19 @@ where
     Self::IdValue: Sync,
   {
     Ok(read_by_id(buffer, id, pool, self).await?)
+  }
+
+  /// Auxiliary method that gets all stored entities filtered by a field.
+  #[inline]
+  async fn read_all_with_params(
+    &self,
+    buffer: &mut S,
+    pool: &PgPool,
+    order_by: OrderBy,
+    limit: Limit,
+    where_str: &str,
+  ) -> Result<Vec<Self::Table>, Self::Error> {
+    Ok(read_all_with_params(buffer, pool, self, order_by, limit, where_str).await?)
   }
 }
 

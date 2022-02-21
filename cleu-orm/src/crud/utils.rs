@@ -1,33 +1,12 @@
 use crate::{
   buffer_try_push_str, buffer_write_fmt, write_column_alias, write_table_field, FromRowsSuffix,
-  SqlWriter, TableParams,
+  Limit, OrderBy, SqlWriter, TableParams,
 };
 use sqlx_core::{
   postgres::{PgPool, PgRow},
   query::query,
   row::Row,
 };
-
-/// Auxiliary method that gets all stored entities filtered by a field.
-#[inline]
-pub async fn read_all_with_where<R, S, T>(
-  buffer: &mut S,
-  pool: &PgPool,
-  table_params: &T,
-  where_str: &str,
-) -> Result<Vec<R>, T::Error>
-where
-  R: FromRowsSuffix<S, Error = T::Error>,
-  S: cl_traits::String,
-  T: TableParams,
-  T::Associations: SqlWriter<S, Error = T::Error>,
-  T::Error: From<crate::Error>,
-{
-  table_params.write_select(buffer, &mut |b| buffer_try_push_str(b, where_str))?;
-  let rows = query(buffer.as_ref()).fetch_all(pool).await.map_err(|err| err.into())?;
-  buffer.clear();
-  collect_entities_tables(buffer, &rows, table_params)
-}
 
 /// Only seeks all rows related to the `T` entity and stops as soon as the primary key changes.
 #[inline]
@@ -109,7 +88,6 @@ where
   Ok(counter)
 }
 
-/// Auxiliary method that gets all stored entities filtered by a field.
 #[inline]
 pub(crate) async fn read_all<R, S, T>(
   buffer: &mut S,
@@ -123,13 +101,12 @@ where
   T::Associations: SqlWriter<S, Error = T::Error>,
   T::Error: From<crate::Error>,
 {
-  table_params.write_select(buffer, &mut |_| Ok(()))?;
+  table_params.write_select(buffer, OrderBy::Ascending, Limit::All, &mut |_| Ok(()))?;
   let rows = query(buffer.as_ref()).fetch_all(pool).await.map_err(|err| err.into())?;
   buffer.clear();
   collect_entities_tables(buffer, &rows, table_params)
 }
 
-/// Auxiliary method that only gets a single entity based on its id.
 #[inline]
 pub(crate) async fn read_by_id<S, T>(
   buffer: &mut S,
@@ -144,7 +121,7 @@ where
   T::Error: From<crate::Error>,
   T::Table: FromRowsSuffix<S, Error = T::Error>,
 {
-  table_params.write_select(buffer, &mut |b| {
+  table_params.write_select(buffer, OrderBy::Ascending, Limit::All, &mut |b| {
     write_table_field(
       b,
       T::table_name(),
@@ -158,6 +135,28 @@ where
   buffer.clear();
   let first_row = rows.first().ok_or(crate::Error::NoDatabaseRowResult)?;
   Ok(T::Table::from_rows_suffix(&rows, buffer, table_params.suffix(), first_row)?.1)
+}
+
+#[inline]
+pub(crate) async fn read_all_with_params<R, S, T>(
+  buffer: &mut S,
+  pool: &PgPool,
+  table_params: &T,
+  order_by: OrderBy,
+  limit: Limit,
+  where_str: &str,
+) -> Result<Vec<R>, T::Error>
+where
+  R: FromRowsSuffix<S, Error = T::Error>,
+  S: cl_traits::String,
+  T: TableParams,
+  T::Associations: SqlWriter<S, Error = T::Error>,
+  T::Error: From<crate::Error>,
+{
+  table_params.write_select(buffer, order_by, limit, &mut |b| buffer_try_push_str(b, where_str))?;
+  let rows = query(buffer.as_ref()).fetch_all(pool).await.map_err(|err| err.into())?;
+  buffer.clear();
+  collect_entities_tables(buffer, &rows, table_params)
 }
 
 /// Collects all entities composed by all different rows.

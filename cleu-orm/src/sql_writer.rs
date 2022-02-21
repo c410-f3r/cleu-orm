@@ -1,6 +1,7 @@
 use crate::{
   buffer_try_push_str, buffer_write_fmt, write_select_field, write_select_join,
-  write_select_order_by, Associations, Fields, SourceAssociation, TableParams, MAX_NODES_NUM,
+  write_select_order_by, Associations, Fields, Limit, OrderBy, SourceAssociation, TableParams,
+  MAX_NODES_NUM,
 };
 use core::fmt;
 
@@ -26,6 +27,8 @@ where
   fn write_select(
     &self,
     buffer: &mut S,
+    order_by: OrderBy,
+    limit: Limit,
     where_cb: &mut impl FnMut(&mut S) -> Result<(), Self::Error>,
   ) -> Result<(), Self::Error>;
 
@@ -128,6 +131,8 @@ where
   fn write_select(
     &self,
     buffer: &mut S,
+    order_by: OrderBy,
+    limit: Limit,
     where_cb: &mut impl FnMut(&mut S) -> Result<(), Self::Error>,
   ) -> Result<(), Self::Error> {
     buffer_try_push_str(buffer, "SELECT ")?;
@@ -153,6 +158,15 @@ where
     self.write_select_orders_by(buffer)?;
     if buffer.as_ref().ends_with(',') {
       buffer.truncate(buffer.as_ref().len().wrapping_sub(1))
+    }
+    match order_by {
+      OrderBy::Ascending => buffer_try_push_str(buffer, " ASC")?,
+      OrderBy::Descending => buffer_try_push_str(buffer, " DESC")?,
+    }
+    buffer_try_push_str(buffer, " LIMIT ")?;
+    match limit {
+      Limit::All => buffer_try_push_str(buffer, "ALL")?,
+      Limit::Count(n) => buffer_write_fmt(buffer, format_args!("{}", n))?,
     }
     Ok(())
   }
