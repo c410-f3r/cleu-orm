@@ -60,7 +60,7 @@ impl_display!(i64);
 impl_display!(u32);
 impl_display!(u64);
 
-#[cfg(feature = "with-arrayvec")]
+#[cfg(feature = "arrayvec")]
 impl_display!(arrayvec::ArrayString<N>, const N: usize);
-#[cfg(feature = "with-rust_decimal")]
+#[cfg(feature = "rust_decimal")]
 impl_display!(rust_decimal::Decimal);

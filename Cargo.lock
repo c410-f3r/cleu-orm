@@ -100,9 +100,6 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 name = "cl-traits"
 version = "6.0.0"
 source = "git+https://github.com/c410-f3r/cl-traits#ef9f8cc818fc6f818a8e3bf77eca8cc600813887"
-dependencies = [
- "arrayvec",
-]
 
 [[package]]
 name = "cleu-orm"

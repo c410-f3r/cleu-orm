@@ -1,6 +1,6 @@
 //! Operations for different types of databases
 
-#![cfg(any(feature = "with-sqlx-postgres", feature = "with-sqlx-runtime-tokio-native-tls"))]
+#![cfg(any(feature = "sqlx-postgres", feature = "sqlx-runtime-tokio-native-tls"))]
 
 mod utils;
 

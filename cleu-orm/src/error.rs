@@ -15,7 +15,7 @@ pub enum Error {
   /// No row was returned by the database
   NoDatabaseRowResult,
   /// Errors of the `sqlx_core` crate
-  #[cfg(any(feature = "with-sqlx-postgres", feature = "with-sqlx-runtime-tokio-native-tls"))]
+  #[cfg(any(feature = "sqlx-postgres", feature = "sqlx-runtime-tokio-native-tls"))]
   Sqlx(sqlx_core::error::Error),
   /// Out of bound index used in an auxiliary structure meaning a programming error
   UnknownAuxIdx(usize),
@@ -40,7 +40,7 @@ impl From<fmt::Error> for Error {
   }
 }
 
-#[cfg(any(feature = "with-sqlx-postgres", feature = "with-sqlx-runtime-tokio-native-tls"))]
+#[cfg(any(feature = "sqlx-postgres", feature = "sqlx-runtime-tokio-native-tls"))]
 impl From<sqlx_core::error::Error> for Error {
   #[inline]
   fn from(from: sqlx_core::error::Error) -> Self {

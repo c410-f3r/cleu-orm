@@ -7,12 +7,12 @@ rust_decimal = { default-features = false, optional = true, version = "1.0" }
 sqlx-core = { default-features = false, optional = true, version = "0.5" }
 
 [features]
+arrayvec = ["dep:arrayvec"]
 default = []
-derive = ["cleu-orm-derive"]
-with-arrayvec = ["arrayvec", "cl-traits/with-arrayvec"]
-with-rust_decimal = ["rust_decimal"]
-with-sqlx-postgres = ["sqlx-core/postgres"]
-with-sqlx-runtime-tokio-native-tls = ["sqlx-core/runtime-tokio-rustls"]
+derive = ["dep:cleu-orm-derive"]
+rust_decimal = ["dep:rust_decimal"]
+sqlx-postgres = ["dep:sqlx-core", "sqlx-core?/postgres"]
+sqlx-runtime-tokio-native-tls = ["dep:sqlx-core", "sqlx-core?/runtime-tokio-rustls"]
 
 [package]
 authors = ["Caio Fernandes <c410.f3r@gmail.com>"]

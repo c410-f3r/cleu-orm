@@ -32,7 +32,7 @@ pub use cleu_orm_derive::*;
 pub use error::*;
 pub use field::*;
 pub use fields::*;
-#[cfg(any(feature = "with-sqlx-postgres", feature = "with-sqlx-runtime-tokio-native-tls"))]
+#[cfg(any(feature = "sqlx-postgres", feature = "sqlx-runtime-tokio-native-tls"))]
 pub use from_rows_suffix::*;
 pub use full_association::*;
 pub(crate) use fx_hasher::*;

@@ -1,4 +1,4 @@
-#![cfg(any(feature = "with-sqlx-postgres", feature = "with-sqlx-runtime-tokio-native-tls"))]
+#![cfg(any(feature = "sqlx-postgres", feature = "sqlx-runtime-tokio-native-tls"))]
 
 use crate::Suffix;
 use sqlx_core::postgres::PgRow;
