@@ -4,9 +4,9 @@ use crate::Suffix;
 use sqlx_core::postgres::PgRow;
 
 /// Constructs a single instance based on an arbitrary number of rows
-pub trait FromRowsSuffix<S>: Sized
+pub trait FromRowsSuffix<B>: Sized
 where
-  S: cl_traits::String,
+  B: cl_traits::String,
 {
   /// See [crate::Error]
   type Error: From<crate::Error>;
@@ -14,7 +14,7 @@ where
   /// See [FromRowsSuffix].
   fn from_rows_suffix(
     all_rows: &[PgRow],
-    buffer: &mut S,
+    buffer: &mut B,
     suffix: Suffix,
     target_row: &PgRow,
   ) -> Result<(usize, Self), Self::Error>;

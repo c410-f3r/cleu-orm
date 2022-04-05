@@ -2,25 +2,21 @@
 
 use core::{hash::Hasher, ops::BitXor};
 
-const K: usize = 0x517cc1b727220a95;
+const K: u64 = 0x517cc1b727220a95;
 
 #[derive(Default)]
-pub(crate) struct FxHasher(usize);
+pub(crate) struct FxHasher(u64);
 
 impl Hasher for FxHasher {
-  #[allow(
-    // It does not matter much since this structure is a hasher
-    clippy::as_conversions
-  )]
   #[inline]
   fn finish(&self) -> u64 {
-    self.0 as _
+    self.0
   }
 
   #[inline]
   fn write(&mut self, bytes: &[u8]) {
     for byte in bytes.iter().copied() {
-      let into: usize = byte.into();
+      let into: u64 = byte.into();
       self.0 = self.0.rotate_left(5).bitxor(into).wrapping_mul(K);
     }
   }

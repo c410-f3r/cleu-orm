@@ -8,14 +8,14 @@ use quote::{format_ident, quote};
 use syn::{parse_macro_input, spanned::Spanned, Data, DataStruct, DeriveInput, Fields};
 use utils::*;
 
-/// Implements [cleu_orm::TableParams].
-#[proc_macro_derive(TableParams, attributes(cleu_orm))]
-pub fn table_params(ts: proc_macro::TokenStream) -> proc_macro::TokenStream {
+/// Implements [cleu_orm::TableDefs].
+#[proc_macro_derive(TableDefs, attributes(cleu_orm))]
+pub fn table_defs(ts: proc_macro::TokenStream) -> proc_macro::TokenStream {
   let input = parse_macro_input!(ts as DeriveInput);
-  do_table_params(input).unwrap_or_else(|err| err.to_compile_error()).into()
+  do_table_defs(input).unwrap_or_else(|err| err.to_compile_error()).into()
 }
 
-fn do_table_params(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
+fn do_table_defs(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
   let input_span = input.span();
 
   let table_struct_name = input.ident.to_string();
@@ -28,7 +28,7 @@ fn do_table_params(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     return Err(syn::Error::new(input_span, "Table element must be a structure with named fields"));
   };
 
-  let associations_ty_name = format_ident!("{}ParamsAssociationsTy", table_struct_name);
+  let associations_ty_name = format_ident!("{}AssociationsTy", table_struct_name);
   let fields_ty_name = format_ident!("{}ParamsFieldsTy", table_struct_name);
   let table_params_struct_name = format_ident!("{}Params", table_struct_name);
   let table_struct_ty = input.ident;
@@ -51,7 +51,7 @@ fn do_table_params(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
       } else {
         &snake_case
       };
-      let associated_table_params_struct_name = format_ident!("{}Params", to_camel_case(a));
+      let associated_table_params_struct_name = format_ident!("{}Defs", to_camel_case(a));
 
       let params = group_params(elem.attrs.get(0)?).ok()?;
 
@@ -72,7 +72,7 @@ fn do_table_params(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
           incrementing_suffix = incrementing_suffix.wrapping_add(1);
           incrementing_suffix
         }),
-        cleu_orm::Association::new(#from_id_expr, #to_id_expr))
+        cleu_orm::TableAssociation::new(#from_id_expr, #to_id_expr))
       })
     });
 
@@ -83,9 +83,9 @@ fn do_table_params(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
       } else {
         &snake_case
       };
-      let associated_table_params_struct_name = format_ident!("{}Params", to_camel_case(a));
+      let associated_table_params_struct_name = format_ident!("{}Defs", to_camel_case(a));
 
-      Some(quote! { (#associated_table_params_struct_name, cleu_orm::Association) })
+      Some(quote! { (#associated_table_params_struct_name, cleu_orm::TableAssociation) })
     });
 
     (association_exprs.collect(), association_types.collect())
@@ -100,7 +100,7 @@ fn do_table_params(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
       #( #association_types, )*
     );
     type #fields_ty_name = (
-      #( cleu_orm::Field<#error_ty, #field_types>, )*
+      #( cleu_orm::TableField<#error_ty, #field_types>, )*
     );
 
     pub struct #table_params_struct_name(
@@ -119,7 +119,7 @@ fn do_table_params(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             #( #association_exprs, )*
           ),
           (
-            #( cleu_orm::Field::new(#field_exprs), )*
+            #( cleu_orm::TableField::new(#field_exprs), )*
           ),
           suffix
         )
@@ -127,41 +127,41 @@ fn do_table_params(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     }
 
     #[automatically_derived]
-    impl cleu_orm::TableParams for #table_params_struct_name {
+    impl cleu_orm::TableValues for #table_params_struct_name {
       type Associations = #associations_ty_name;
+      type Entity = #table_struct_ty;
       type Error = #error_ty;
       type Fields = #fields_ty_name;
       type IdValue = i32;
-      type Table = #table_struct_ty;
 
       #[inline]
-      fn associations(&self) -> &Self::Associations {
-        &self.0
-      }
-
-      #[inline]
-      fn associations_mut(&mut self) -> &mut Self::Associations {
-        &mut self.0
-      }
-
-      #[inline]
-      fn fields(&self) -> &Self::Fields {
-        &self.1
-      }
-
-      #[inline]
-      fn fields_mut(&mut self) -> &mut Self::Fields {
-        &mut self.1
-      }
-
-      #[inline]
-      fn id_field(&self) -> &cleu_orm::Field<#error_ty, i32> {
+      fn id_field(&self) -> &cleu_orm::TableField<#error_ty, i32> {
         &self.1.0
       }
 
       #[inline]
       fn suffix(&self) -> cleu_orm::Suffix {
         self.2
+      }
+
+      #[inline]
+      fn table_associations(&self) -> &Self::TableAssociations {
+        &self.0
+      }
+
+      #[inline]
+      fn table_associations_mut(&mut self) -> &mut Self::TableAssociations {
+        &mut self.0
+      }
+
+      #[inline]
+      fn table_fields(&self) -> &Self::Fields {
+        &self.1
+      }
+
+      #[inline]
+      fn table_fields_mut(&mut self) -> &mut Self::Fields {
+        &mut self.1
       }
 
       #[inline]

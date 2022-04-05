@@ -7,7 +7,6 @@ pub struct Foo {
   _name: String,
 }
 
-
 fn main() {
   assert_eq!(FooParams::table_name(), "BAR");
   assert_eq!(FooParams::table_name_alias(), Some("FOO"));

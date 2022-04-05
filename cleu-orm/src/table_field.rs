@@ -1,14 +1,18 @@
+use crate::SqlValue;
 use core::marker::PhantomData;
 
 /// Table field name and its associated Rust type
-#[derive(Debug)]
-pub struct Field<E, T> {
+#[derive(Debug, PartialEq)]
+pub struct TableField<E, T> {
   name: &'static str,
   phantom: PhantomData<E>,
   value: Option<T>,
 }
 
-impl<E, T> Field<E, T> {
+impl<E, T> TableField<E, T>
+where
+  T: SqlValue,
+{
   /// Creates a new instance from the table field name
   #[inline]
   pub const fn new(name: &'static str) -> Self {

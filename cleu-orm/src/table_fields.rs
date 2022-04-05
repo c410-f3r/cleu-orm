@@ -1,5 +1,5 @@
 /// Groups tuples that form all fields of a table
-pub trait Fields {
+pub trait TableFields {
   /// See [crate::Error]
   type Error: From<crate::Error>;
   /// See [Fields::field_names]
@@ -9,7 +9,7 @@ pub trait Fields {
   fn field_names(&self) -> Self::FieldNames;
 
   /// Writes the table instance values
-  fn write_table_values<S>(&self, buffer: &mut S) -> Result<(), Self::Error>
+  fn write_values<B>(&self, buffer: &mut B) -> Result<(), Self::Error>
   where
-    S: cl_traits::String;
+    B: cl_traits::String;
 }

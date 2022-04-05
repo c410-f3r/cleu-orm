@@ -14,4 +14,4 @@ $rt rustfmt
 $rt clippy
 
 rust-tools test-generic cleu-orm
-cargo test cleu-orm-derive
+#cargo test cleu-orm-derive

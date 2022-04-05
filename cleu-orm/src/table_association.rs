@@ -1,11 +1,11 @@
 /// Table association and its associated Rust type
-#[derive(Debug)]
-pub struct Association {
+#[derive(Clone, Copy, Debug)]
+pub struct TableAssociation {
   from_id: &'static str,
   to_id: &'static str,
 }
 
-impl Association {
+impl TableAssociation {
   /// Creates a new instance from all parameters
   #[inline]
   pub const fn new(from_id: &'static str, to_id: &'static str) -> Self {

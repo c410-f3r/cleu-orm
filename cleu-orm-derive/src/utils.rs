@@ -26,8 +26,11 @@ pub(crate) fn container_attrs(
   let mut table_name_opt = None;
 
   for attr in attrs {
-    let (group_ident, group_pairs) =
-      if let Ok(elem) = group_params(attr) { elem } else { continue };
+    let (group_ident, group_pairs) = if let Ok(elem) = group_params(attr) {
+      elem
+    } else {
+      continue;
+    };
 
     if group_ident == "error" {
       let err = |err_span| {

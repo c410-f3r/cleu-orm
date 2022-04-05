@@ -1,5 +1,5 @@
 [workspace]
 members = [
     "cleu-orm",
-    "cleu-orm-derive"
+    #"cleu-orm-derive"
 ]

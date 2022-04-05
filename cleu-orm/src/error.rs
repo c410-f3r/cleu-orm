@@ -11,7 +11,7 @@ pub enum Error {
   Fmt(fmt::Error),
   /// Some internal operation found a hash collision of two table ids (likely) or a hash collision
   /// due to a number of nested associations larger than `MAX_NODES_NUM` (unlikely).
-  HashCollision(&'static str, &'static str),
+  HashCollision(usize, &'static str, &'static str),
   /// No row was returned by the database
   NoDatabaseRowResult,
   /// Errors of the `sqlx_core` crate

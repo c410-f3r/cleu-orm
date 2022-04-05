@@ -1,6 +1,6 @@
 /// Sql select `ORDER BY` clause
 #[derive(Clone, Copy, Debug)]
-pub enum OrderBy {
+pub enum SelectOrderBy {
   /// ORDER BY ... ASC
   Ascending,
   /// ORDER BY ... DESC

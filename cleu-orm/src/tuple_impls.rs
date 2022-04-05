@@ -1,32 +1,38 @@
 use crate::{
-  buffer_try_push_str, Association, Associations, Field, Fields, FullAssociation, Limit, OrderBy,
-  SourceAssociation, SqlValue, SqlWriter, TableParams, MAX_NODES_NUM,
+  write_insert_field, FullTableAssociation, SelectLimit, SelectOrderBy, SqlValue, SqlWriter, Table,
+  TableAssociation, TableAssociations, TableDefs, TableField, TableFields, TableSourceAssociation,
+  MAX_NODES_NUM,
 };
-use core::{array, fmt};
+use cl_traits::{CapacityUpperBound, SingleTypeStorage};
+use core::{array, fmt::Display};
 
-macro_rules! tuple_impls {
+macro_rules! double_tuple_impls {
   ($(
     $tuple_len:tt {
-      $(($idx:tt) -> $T:ident)+
+      $(($idx:tt) -> $T:ident $U:ident)+
     }
   )+) => {
     $(
-      impl<ERR, $($T: TableParams<Error = ERR>),+> Associations for ($( ($T, Association), )+)
+      impl<'entity, ERR, $($T, $U,)+> TableAssociations for ($( (Table<'entity, $U>, $T, TableAssociation), )+)
       where
-        ERR: From<crate::Error>
+        ERR: From<crate::Error>,
+        $(
+          $T: AsRef<[Table<'entity, $U>]>
+            + CapacityUpperBound
+            + SingleTypeStorage<Item = Table<'entity, $U>>,
+          $U: TableDefs<'entity, Error = ERR>,
+        )+
       {
-        type FullAssociations<'full_associations>
-        where
-          $($T: 'full_associations,)+ = array::IntoIter<FullAssociation<'full_associations>, $tuple_len>;
+        type FullTableAssociations = array::IntoIter<FullTableAssociation, $tuple_len>;
 
         #[inline]
-        fn full_associations<'this>(&'this self) -> Self::FullAssociations<'this> {
+        fn full_associations(&self) -> Self::FullTableAssociations {
           [
             $(
-              FullAssociation::new(
-                &self.$idx.1,
-                $T::table_name(),
-                $T::table_name_alias(),
+              FullTableAssociation::new(
+                self.$idx.2,
+                $U::TABLE_NAME,
+                $U::TABLE_NAME_ALIAS,
                 self.$idx.0.suffix()
               ),
             )+
@@ -34,32 +40,42 @@ macro_rules! tuple_impls {
         }
       }
 
-      impl<BUFFER, ERR, $($T,)+> SqlWriter<BUFFER> for ($( ($T, Association), )+)
+      impl<'entity, BUFFER, ERR, $($T, $U,)+> SqlWriter<BUFFER> for ($( (Table<'entity, $U>, $T, TableAssociation), )+)
       where
         BUFFER: cl_traits::String,
         ERR: From<crate::Error>,
         $(
-          $T: TableParams<Error = ERR>,
-          $T::Associations: SqlWriter<BUFFER, Error = ERR>,
+          $T: AsRef<[Table<'entity, $U>]>
+            + CapacityUpperBound
+            + SingleTypeStorage<Item = Table<'entity, $U>>,
+          $U: TableDefs<'entity, Error = ERR>,
+          $U::Associations: SqlWriter<BUFFER, Error = ERR>,
         )+
       {
         type Error = ERR;
 
         #[inline]
-        fn write_insert<'value, V>(
+        fn write_insert<'value, VALUE>(
           &self,
           aux: &mut [Option<&'static str>; MAX_NODES_NUM],
           buffer: &mut BUFFER,
-          source_association: &mut Option<SourceAssociation<'value, V>>
+          table_source_association: &mut Option<TableSourceAssociation<'value, VALUE>>
         ) -> Result<(), Self::Error>
         where
-          V: fmt::Display
+          VALUE: Display
         {
           $(
-            if let Some(ref mut elem) = source_association.as_mut() {
-              *elem.source_field_mut() = self.$idx.1.to_id();
+            if let Some(ref mut elem) = table_source_association.as_mut() {
+              *elem.source_field_mut() = self.$idx.2.to_id();
             }
-            self.$idx.0.write_insert(aux, buffer, source_association)?;
+            if self.$idx.1.capacity_upper_bound() == 0 {
+              self.$idx.0.write_insert(aux, buffer, table_source_association)?;
+            }
+            else {
+              for elem in self.$idx.1.as_ref() {
+                elem.write_insert(aux, buffer, table_source_association)?;
+              }
+            }
           )+
           Ok(())
         }
@@ -68,11 +84,13 @@ macro_rules! tuple_impls {
         fn write_select(
           &self,
           buffer: &mut BUFFER,
-          order_by: OrderBy,
-          limit: Limit,
+          order_by: SelectOrderBy,
+          limit: SelectLimit,
           where_cb: &mut impl FnMut(&mut BUFFER) -> Result<(), Self::Error>,
         ) -> Result<(), Self::Error> {
-          $( self.$idx.0.write_select(buffer, order_by, limit, where_cb)?; )+
+          $(
+            self.$idx.0.write_select(buffer, order_by, limit, where_cb)?;
+          )+
           Ok(())
         }
 
@@ -81,7 +99,9 @@ macro_rules! tuple_impls {
           &self,
             buffer: &mut BUFFER,
         ) -> Result<(), Self::Error> {
-          $( self.$idx.0.write_select_associations(buffer)?; )+
+          $(
+            self.$idx.0.write_select_associations(buffer)?;
+          )+
           Ok(())
         }
 
@@ -90,18 +110,32 @@ macro_rules! tuple_impls {
           &self,
             buffer: &mut BUFFER,
         ) -> Result<(), Self::Error> {
-          $( self.$idx.0.write_select_fields(buffer)?; )+
+          $(
+            self.$idx.0.write_select_fields(buffer)?;
+          )+
           Ok(())
         }
 
         #[inline]
         fn write_select_orders_by(&self, buffer: &mut BUFFER) -> Result<(), Self::Error> {
-          $( self.$idx.0.write_select_orders_by(buffer)?; )+
+          $(
+            self.$idx.0.write_select_orders_by(buffer)?;
+          )+
           Ok(())
         }
       }
+    )+
+  }
+}
 
-      impl<ERR, $($T: SqlValue),+> Fields for ($( Field<ERR, $T>, )+)
+macro_rules! tuple_impls {
+  ($(
+    $tuple_len:tt {
+      $(($idx:tt) -> $T:ident)+
+    }
+  )+) => {
+    $(
+      impl<ERR, $($T: SqlValue),+> TableFields for ($( TableField<ERR, $T>, )+)
       where
         ERR: From<crate::Error>
       {
@@ -114,20 +148,122 @@ macro_rules! tuple_impls {
         }
 
         #[inline]
-        fn write_table_values<BUFFER>(&self, buffer: &mut BUFFER) -> Result<(), Self::Error>
+        fn write_values<BUFFER>(&self, buffer: &mut BUFFER) -> Result<(), Self::Error>
         where
           BUFFER: cl_traits::String
         {
           $(
-            if let Some(ref elem) = *self.$idx.value() {
-              elem.write(buffer)?;
-              buffer_try_push_str(buffer, ",")?;
-            }
+            write_insert_field(buffer, &self.$idx)?;
           )+
           Ok(())
         }
       }
     )+
+  }
+}
+
+double_tuple_impls! {
+  1 {
+    (0) -> A B
+  }
+  2 {
+    (0) -> A B
+    (1) -> C D
+  }
+  3 {
+    (0) -> A B
+    (1) -> C D
+    (2) -> E F
+  }
+  4 {
+    (0) -> A B
+    (1) -> C D
+    (2) -> E F
+    (3) -> G H
+  }
+  5 {
+    (0) -> A B
+    (1) -> C D
+    (2) -> E F
+    (3) -> G H
+    (4) -> I J
+  }
+  6 {
+    (0) -> A B
+    (1) -> C D
+    (2) -> E F
+    (3) -> G H
+    (4) -> I J
+    (5) -> K L
+  }
+  7 {
+    (0) -> A B
+    (1) -> C D
+    (2) -> E F
+    (3) -> G H
+    (4) -> I J
+    (5) -> K L
+    (6) -> M N
+  }
+  8 {
+    (0) -> A B
+    (1) -> C D
+    (2) -> E F
+    (3) -> G H
+    (4) -> I J
+    (5) -> K L
+    (6) -> M N
+    (7) -> O P
+  }
+  9 {
+    (0) -> A B
+    (1) -> C D
+    (2) -> E F
+    (3) -> G H
+    (4) -> I J
+    (5) -> K L
+    (6) -> M N
+    (7) -> O P
+    (8) -> Q R
+  }
+  10 {
+    (0) -> A B
+    (1) -> C D
+    (2) -> E F
+    (3) -> G H
+    (4) -> I J
+    (5) -> K L
+    (6) -> M N
+    (7) -> O P
+    (8) -> Q R
+    (9) -> S T
+  }
+  11 {
+    (0) -> A B
+    (1) -> C D
+    (2) -> E F
+    (3) -> G H
+    (4) -> I J
+    (5) -> K L
+    (6) -> M N
+    (7) -> O P
+    (8) -> Q R
+    (9) -> S T
+    (10) -> U V
+  }
+  12 {
+    (0) -> A B
+    (1) -> C D
+    (2) -> E F
+    (3) -> G H
+    (4) -> I J
+    (5) -> K L
+    (6) -> M N
+    (7) -> O P
+    (8) -> Q R
+    (9) -> S T
+    (10) -> U V
+    (11) -> W X
   }
 }
 
