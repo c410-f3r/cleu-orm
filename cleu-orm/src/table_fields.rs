@@ -8,8 +8,13 @@ pub trait TableFields {
   /// Yields all table field names
   fn field_names(&self) -> Self::FieldNames;
 
-  /// Writes the table instance values
-  fn write_values<B>(&self, buffer: &mut B) -> Result<(), Self::Error>
+  /// Writes the table instance values for INSERT statements
+  fn write_insert_values<B>(&self, buffer: &mut B) -> Result<(), Self::Error>
+  where
+    B: cl_traits::String;
+
+  /// Writes the table instance values for UPDATE statements
+  fn write_update_values<B>(&self, buffer: &mut B) -> Result<(), Self::Error>
   where
     B: cl_traits::String;
 }

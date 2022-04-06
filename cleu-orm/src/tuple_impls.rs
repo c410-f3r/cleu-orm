@@ -1,7 +1,7 @@
 use crate::{
-  write_insert_field, FullTableAssociation, SelectLimit, SelectOrderBy, SqlValue, SqlWriter, Table,
-  TableAssociation, TableAssociations, TableDefs, TableField, TableFields, TableSourceAssociation,
-  MAX_NODES_NUM,
+  buffer_try_push_str, buffer_write_fmt, FullTableAssociation, SelectLimit, SelectOrderBy,
+  SqlValue, SqlWriter, Table, TableAssociation, TableAssociations, TableDefs, TableField,
+  TableFields, TableSourceAssociation, MAX_NODES_NUM,
 };
 use cl_traits::{CapacityUpperBound, SingleTypeStorage};
 use core::{array, fmt::Display};
@@ -123,6 +123,25 @@ macro_rules! double_tuple_impls {
           )+
           Ok(())
         }
+
+        #[inline]
+        fn write_update(
+          &self,
+          aux: &mut [Option<&'static str>; MAX_NODES_NUM],
+          buffer: &mut BUFFER,
+        ) -> Result<(), Self::Error> {
+          $(
+            if self.$idx.1.capacity_upper_bound() == 0 {
+              self.$idx.0.write_update(aux, buffer)?;
+            }
+            else {
+              for elem in self.$idx.1.as_ref() {
+                elem.write_update(aux, buffer)?;
+              }
+            }
+          )+
+          Ok(())
+        }
       }
     )+
   }
@@ -148,12 +167,30 @@ macro_rules! tuple_impls {
         }
 
         #[inline]
-        fn write_values<BUFFER>(&self, buffer: &mut BUFFER) -> Result<(), Self::Error>
+        fn write_insert_values<BUFFER>(&self, buffer: &mut BUFFER) -> Result<(), Self::Error>
         where
           BUFFER: cl_traits::String
         {
           $(
-            write_insert_field(buffer, &self.$idx)?;
+            if let &Some(ref elem) = self.$idx.value() {
+              elem.write(buffer)?;
+              buffer_try_push_str(buffer, ",")?;
+            }
+          )+
+          Ok(())
+        }
+
+        #[inline]
+        fn write_update_values<BUFFER>(&self, buffer: &mut BUFFER) -> Result<(), Self::Error>
+        where
+          BUFFER: cl_traits::String
+        {
+          $(
+            if let &Some(ref elem) = self.$idx.value() {
+              buffer_write_fmt(buffer, format_args!("{}=", self.$idx.name()))?;
+              elem.write(buffer)?;
+              buffer_try_push_str(buffer, ",")?;
+            }
           )+
           Ok(())
         }

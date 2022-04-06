@@ -1,4 +1,4 @@
-use crate::{FullTableAssociation, SqlValue, Suffix, TableField};
+use crate::{FullTableAssociation, Suffix};
 use core::fmt::Arguments;
 
 /// Shortcut of `buffer.try_push(...)`
@@ -37,20 +37,23 @@ where
 }
 
 #[inline]
-pub(crate) fn write_insert_field<B, E, T>(
-  buffer: &mut B,
-  table_field: &TableField<E, T>,
-) -> Result<(), E>
+pub(crate) fn truncate_if_ends_with_char<B>(buffer: &mut B, c: char)
 where
   B: cl_traits::String,
-  E: From<crate::Error>,
-  T: SqlValue,
 {
-  if let Some(ref elem) = *table_field.value() {
-    elem.write(buffer)?;
-    buffer_try_push_str(buffer, ",")?;
+  if buffer.as_ref().ends_with(c) {
+    buffer.truncate(buffer.as_ref().len().wrapping_sub(1))
   }
-  Ok(())
+}
+
+#[inline]
+pub(crate) fn truncate_if_ends_with_str<B>(buffer: &mut B, s: &str)
+where
+  B: cl_traits::String,
+{
+  if buffer.as_ref().ends_with(s) {
+    buffer.truncate(buffer.as_ref().len().wrapping_sub(s.len()))
+  }
 }
 
 #[inline]

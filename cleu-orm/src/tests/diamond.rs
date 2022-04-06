@@ -168,6 +168,7 @@ fn assert_sizes() {
 fn multi_referred_table_has_correct_statements() {
   let mut buffer = String::new();
   let mut d_table_defs = Table::<DTableDefs>::default();
+
   d_table_defs
     .write_select(&mut buffer, SelectOrderBy::Ascending, SelectLimit::All, &mut |_| Ok(()))
     .unwrap();
@@ -175,8 +176,10 @@ fn multi_referred_table_has_correct_statements() {
     &buffer,
     r#"SELECT "d0".id AS d0__id,"d0".name AS d0__name,"b1".id AS b1__id,"b1".name AS b1__name,"a2".id AS a2__id,"a2".name AS a2__name,"c2".id AS c2__id,"c2".name AS c2__name,"a3".id AS a3__id,"a3".name AS a3__name FROM "d" AS "d0" LEFT JOIN "b" AS "b1" ON "d0".id = "b1".id_d LEFT JOIN "c" AS "c2" ON "d0".id = "c2".id_d LEFT JOIN "a" AS "a2" ON "b1".id = "a2".id_b LEFT JOIN "a" AS "a3" ON "c2".id = "a3".id_c  ORDER BY "d0".id,"b1".id,"a2".id,"c2".id,"a3".id ASC LIMIT ALL"#
   );
-  buffer.clear();
+
   d_table_defs.update_table_fields(&D);
+
+  buffer.clear();
   d_table_defs
     .write_insert::<InitialInsertValue>(
       &mut [Default::default(); MAX_NODES_NUM],
@@ -187,6 +190,13 @@ fn multi_referred_table_has_correct_statements() {
   assert_eq!(
     &buffer,
     r#"INSERT INTO "d" (id,name) VALUES ('4','foo4');INSERT INTO "b" (id,name,id_d) VALUES ('2','foo2','4');INSERT INTO "a" (id,name,id_b) VALUES ('1','foo1','2');INSERT INTO "c" (id,name,id_d) VALUES ('3','foo3','4');"#
+  );
+
+  buffer.clear();
+  d_table_defs.write_update(&mut [Default::default(); MAX_NODES_NUM], &mut buffer).unwrap();
+  assert_eq!(
+    &buffer,
+    r#"UPDATE d SET id='4',name='foo4' WHERE id='4';UPDATE b SET id='2',name='foo2' WHERE id='2';UPDATE a SET id='1',name='foo1' WHERE id='1';UPDATE c SET id='3',name='foo3' WHERE id='3';"#
   );
 }
 
@@ -201,8 +211,10 @@ fn referred_table_has_correct_statements() {
     &buffer,
     r#"SELECT "b0".id AS b0__id,"b0".name AS b0__name,"a1".id AS a1__id,"a1".name AS a1__name FROM "b" AS "b0" LEFT JOIN "a" AS "a1" ON "b0".id = "a1".id_b  ORDER BY "b0".id,"a1".id ASC LIMIT ALL"#
   );
-  buffer.clear();
+
   b_table_defs.update_table_fields(&B);
+
+  buffer.clear();
   b_table_defs
     .write_insert::<InitialInsertValue>(
       &mut [Default::default(); MAX_NODES_NUM],
@@ -213,6 +225,13 @@ fn referred_table_has_correct_statements() {
   assert_eq!(
     &buffer,
     r#"INSERT INTO "b" (id,name) VALUES ('2','foo2');INSERT INTO "a" (id,name,id_b) VALUES ('1','foo1','2');"#
+  );
+
+  buffer.clear();
+  b_table_defs.write_update(&mut [Default::default(); MAX_NODES_NUM], &mut buffer).unwrap();
+  assert_eq!(
+    &buffer,
+    r#"UPDATE b SET id='2',name='foo2' WHERE id='2';UPDATE a SET id='1',name='foo1' WHERE id='1';"#
   );
 }
 
@@ -227,8 +246,10 @@ fn standalone_table_has_correct_statements() {
     &buffer,
     r#"SELECT "a0".id AS a0__id,"a0".name AS a0__name FROM "a" AS "a0"  ORDER BY "a0".id ASC LIMIT ALL"#
   );
-  buffer.clear();
+
   a_table_defs.update_table_fields(&A);
+
+  buffer.clear();
   a_table_defs
     .write_insert::<InitialInsertValue>(
       &mut [Default::default(); MAX_NODES_NUM],
@@ -237,4 +258,8 @@ fn standalone_table_has_correct_statements() {
     )
     .unwrap();
   assert_eq!(&buffer, r#"INSERT INTO "a" (id,name) VALUES ('1','foo1');"#);
+
+  buffer.clear();
+  a_table_defs.write_update(&mut [Default::default(); MAX_NODES_NUM], &mut buffer).unwrap();
+  assert_eq!(&buffer, r#"UPDATE a SET id='1',name='foo1' WHERE id='1';"#);
 }

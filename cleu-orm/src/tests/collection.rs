@@ -128,6 +128,25 @@ fn assert_sizes() {
 }
 
 #[test]
+fn update_some_values_has_correct_behavior() {
+  let a1 = A { id: 1, name: "foo1" };
+  let a2 = A { id: 2, name: "foo2" };
+  let c3 = C { r#as: vec![a1, a2], bs: vec![], id: 3, name: "foo3" };
+
+  let mut buffer = String::new();
+  let mut c_table_defs = Table::<CTableDefs>::default();
+
+  *c_table_defs.id_field_mut().value_mut() = Some(&c3.id);
+
+  let mut elem = Table::new(0);
+  *elem.id_field_mut().value_mut() = Some(&c3.r#as[0].id);
+  c_table_defs.associations_mut().0.1.push(elem);
+
+  c_table_defs.write_update(&mut [Default::default(); MAX_NODES_NUM], &mut buffer).unwrap();
+  assert_eq!(&buffer, r#"UPDATE c SET id='3' WHERE id='3';UPDATE a SET id='1' WHERE id='1';"#);
+}
+
+#[test]
 fn write_collection_has_correct_params() {
   let a1 = A { id: 1, name: "foo1" };
   let a2 = A { id: 2, name: "foo2" };
@@ -137,15 +156,6 @@ fn write_collection_has_correct_params() {
   let mut c_table_defs = Table::<CTableDefs>::default();
 
   c_table_defs
-    .write_select(&mut buffer, SelectOrderBy::Ascending, SelectLimit::All, &mut |_| Ok(()))
-    .unwrap();
-  assert_eq!(
-    &buffer,
-    r#"SELECT "c0".id AS c0__id,"c0".name AS c0__name,"a1".id AS a1__id,"a1".name AS a1__name,"b2".id AS b2__id,"b2".name AS b2__name FROM "c" AS "c0" LEFT JOIN "a" AS "a1" ON "c0".id = "a1".id_a LEFT JOIN "b" AS "b2" ON "c0".id = "b2".id_b  ORDER BY "c0".id,"a1".id,"b2".id ASC LIMIT ALL"#
-  );
-
-  buffer.clear();
-  c_table_defs
     .write_insert::<InitialInsertValue>(
       &mut [Default::default(); MAX_NODES_NUM],
       &mut buffer,
@@ -154,8 +164,6 @@ fn write_collection_has_correct_params() {
     .unwrap();
   assert_eq!(&buffer, r#""#);
 
-  c_table_defs.update_table_fields(&c3);
-
   buffer.clear();
   c_table_defs
     .write_select(&mut buffer, SelectOrderBy::Ascending, SelectLimit::All, &mut |_| Ok(()))
@@ -164,6 +172,12 @@ fn write_collection_has_correct_params() {
     &buffer,
     r#"SELECT "c0".id AS c0__id,"c0".name AS c0__name,"a1".id AS a1__id,"a1".name AS a1__name,"b2".id AS b2__id,"b2".name AS b2__name FROM "c" AS "c0" LEFT JOIN "a" AS "a1" ON "c0".id = "a1".id_a LEFT JOIN "b" AS "b2" ON "c0".id = "b2".id_b  ORDER BY "c0".id,"a1".id,"b2".id ASC LIMIT ALL"#
   );
+
+  buffer.clear();
+  c_table_defs.write_update(&mut [Default::default(); MAX_NODES_NUM], &mut buffer).unwrap();
+  assert_eq!(&buffer, r#""#);
+
+  c_table_defs.update_table_fields(&c3);
 
   buffer.clear();
   c_table_defs
@@ -176,5 +190,21 @@ fn write_collection_has_correct_params() {
   assert_eq!(
     &buffer,
     r#"INSERT INTO "c" (id,name) VALUES ('3','foo3');INSERT INTO "a" (id,name,id_a) VALUES ('1','foo1','3');INSERT INTO "a" (id,name,id_a) VALUES ('2','foo2','3');"#
+  );
+
+  buffer.clear();
+  c_table_defs
+    .write_select(&mut buffer, SelectOrderBy::Ascending, SelectLimit::All, &mut |_| Ok(()))
+    .unwrap();
+  assert_eq!(
+    &buffer,
+    r#"SELECT "c0".id AS c0__id,"c0".name AS c0__name,"a1".id AS a1__id,"a1".name AS a1__name,"b2".id AS b2__id,"b2".name AS b2__name FROM "c" AS "c0" LEFT JOIN "a" AS "a1" ON "c0".id = "a1".id_a LEFT JOIN "b" AS "b2" ON "c0".id = "b2".id_b  ORDER BY "c0".id,"a1".id,"b2".id ASC LIMIT ALL"#
+  );
+
+  buffer.clear();
+  c_table_defs.write_update(&mut [Default::default(); MAX_NODES_NUM], &mut buffer).unwrap();
+  assert_eq!(
+    &buffer,
+    r#"UPDATE c SET id='3',name='foo3' WHERE id='3';UPDATE a SET id='1',name='foo1' WHERE id='1';UPDATE a SET id='2',name='foo2' WHERE id='2';"#
   );
 }

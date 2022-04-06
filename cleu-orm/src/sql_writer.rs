@@ -1,9 +1,13 @@
+mod write_insert;
+mod write_select;
+mod write_update;
+
 use crate::{
-  buffer_try_push_str, buffer_write_fmt, write_full_select_field, write_insert_field,
-  write_select_join, write_select_order_by, SelectLimit, SelectOrderBy, Table, TableAssociations,
-  TableDefs, TableFields, TableSourceAssociation, MAX_NODES_NUM,
+  buffer_try_push_str, write_full_select_field, write_select_join, write_select_order_by,
+  SelectLimit, SelectOrderBy, Table, TableAssociations, TableDefs, TableFields,
+  TableSourceAssociation, MAX_NODES_NUM,
 };
-use core::fmt::Display;
+use core::{fmt::Display, marker::PhantomData};
 
 /// Writes raw SQL commands
 pub trait SqlWriter<B>
@@ -40,16 +44,23 @@ where
 
   /// Only writes ORDER BY commands that belong to SELECT
   fn write_select_orders_by(&self, buffer: &mut B) -> Result<(), Self::Error>;
+
+  /// Writes an entire UPDATE command
+  fn write_update(
+    &self,
+    aux: &mut [Option<&'static str>; MAX_NODES_NUM],
+    buffer: &mut B,
+  ) -> Result<(), Self::Error>;
 }
 
-impl<'entity, B, E, TD> SqlWriter<B> for Table<'entity, TD>
+impl<'entity, B, TD> SqlWriter<B> for Table<'entity, TD>
 where
   B: cl_traits::String,
-  E: From<crate::Error>,
-  TD: TableDefs<'entity, Error = E>,
-  TD::Associations: SqlWriter<B, Error = E>,
+  TD: TableDefs<'entity>,
+  TD::Associations: SqlWriter<B, Error = TD::Error>,
+  TD::Error: From<crate::Error>,
 {
-  type Error = E;
+  type Error = TD::Error;
 
   #[inline]
   fn write_insert<'value, V>(
@@ -61,41 +72,7 @@ where
   where
     V: Display,
   {
-    let idx = self.instance_idx();
-    let table_name_opt = aux.get_mut(idx).ok_or(crate::Error::UnknownAuxIdx(idx))?;
-
-    if let Some(table_name) = *table_name_opt {
-      if table_name == TD::TABLE_NAME {
-        return Ok(());
-      } else {
-        return Err(crate::Error::HashCollision(idx, table_name, TD::TABLE_NAME).into());
-      }
-    } else {
-      *table_name_opt = Some(TD::TABLE_NAME);
-    }
-
-    let elem_opt = || {
-      if let Some(ref el) = *tsa {
-        (el.source_field() != self.id_field().name()).then(|| el)
-      } else {
-        None
-      }
-    };
-
-    if let Some(elem) = elem_opt() {
-      write_insert_manager(
-        buffer,
-        self,
-        |local| buffer_write_fmt(local, format_args!(",{}", elem.source_field())),
-        |local| buffer_write_fmt(local, format_args!("'{}',", elem.source_value())),
-      )?;
-    } else {
-      write_insert_manager(buffer, self, |_| Ok(()), |_| Ok(()))?;
-    }
-    let mut new_tsa = self.id_field().value().as_ref().map(TableSourceAssociation::new);
-    self.associations().write_insert(aux, buffer, &mut new_tsa)?;
-
-    Ok(())
+    SqlWriterLogic::write_insert(aux, buffer, self, tsa)
   }
 
   #[inline]
@@ -106,40 +83,7 @@ where
     select_limit: SelectLimit,
     where_cb: &mut impl FnMut(&mut B) -> Result<(), Self::Error>,
   ) -> Result<(), Self::Error> {
-    buffer_try_push_str(buffer, "SELECT ")?;
-    self.write_select_fields(buffer)?;
-    if buffer.as_ref().ends_with(',') {
-      buffer.truncate(buffer.as_ref().len().wrapping_sub(1))
-    }
-    buffer_write_fmt(
-      buffer,
-      format_args!(
-        " FROM \"{table}\" AS \"{table}{suffix}\" ",
-        suffix = self.suffix(),
-        table = TD::TABLE_NAME
-      ),
-    )?;
-    self.write_select_associations(buffer)?;
-    buffer_try_push_str(buffer, " WHERE ")?;
-    where_cb(buffer)?;
-    if buffer.as_ref().ends_with(" WHERE ") {
-      buffer.truncate(buffer.as_ref().len().wrapping_sub(7))
-    }
-    buffer_try_push_str(buffer, " ORDER BY ")?;
-    self.write_select_orders_by(buffer)?;
-    if buffer.as_ref().ends_with(',') {
-      buffer.truncate(buffer.as_ref().len().wrapping_sub(1))
-    }
-    match order_by {
-      SelectOrderBy::Ascending => buffer_try_push_str(buffer, " ASC")?,
-      SelectOrderBy::Descending => buffer_try_push_str(buffer, " DESC")?,
-    }
-    buffer_try_push_str(buffer, " LIMIT ")?;
-    match select_limit {
-      SelectLimit::All => buffer_try_push_str(buffer, "ALL")?,
-      SelectLimit::Count(n) => buffer_write_fmt(buffer, format_args!("{}", n))?,
-    }
-    Ok(())
+    SqlWriterLogic::write_select(buffer, order_by, select_limit, self, where_cb)
   }
 
   #[inline]
@@ -183,41 +127,20 @@ where
     self.associations().write_select_orders_by(buffer)?;
     Ok(())
   }
+
+  #[inline]
+  fn write_update(
+    &self,
+    aux: &mut [Option<&'static str>; MAX_NODES_NUM],
+    buffer: &mut B,
+  ) -> Result<(), Self::Error> {
+    SqlWriterLogic::write_update(aux, buffer, self)
+  }
 }
 
-fn write_insert_manager<'entity, B, E, TD>(
-  buffer: &mut B,
-  table: &Table<'entity, TD>,
-  foreign_key_name_cb: impl Fn(&mut B) -> crate::Result<()>,
-  foreign_key_value_cb: impl Fn(&mut B) -> crate::Result<()>,
-) -> Result<(), E>
+struct SqlWriterLogic<'entity, B, TD>(PhantomData<(&'entity (), B, TD)>)
 where
   B: cl_traits::String,
-  E: From<crate::Error>,
-  TD: TableDefs<'entity, Error = E>,
-  TD::Associations: SqlWriter<B, Error = E>,
-{
-  let len_before_insert = buffer.as_ref().len();
-  buffer_write_fmt(buffer, format_args!("INSERT INTO \"{}\" (", TD::TABLE_NAME))?;
-  buffer_try_push_str(buffer, table.id_field().name())?;
-  for field in table.fields().field_names() {
-    buffer_write_fmt(buffer, format_args!(",{}", field))?;
-  }
-  foreign_key_name_cb(&mut *buffer)?;
-
-  buffer_try_push_str(buffer, ") VALUES (")?;
-  let len_after_values = buffer.as_ref().len();
-  write_insert_field(buffer, table.id_field())?;
-  table.fields().write_values(buffer)?;
-
-  if buffer.as_ref().len() == len_after_values {
-    buffer.truncate(len_before_insert);
-  } else {
-    foreign_key_value_cb(&mut *buffer)?;
-    if buffer.as_ref().ends_with(',') {
-      buffer.truncate(buffer.as_ref().len().wrapping_sub(1))
-    }
-    buffer_try_push_str(buffer, ");")?;
-  }
-  Ok(())
-}
+  TD: TableDefs<'entity>,
+  TD::Associations: SqlWriter<B, Error = TD::Error>,
+  TD::Error: From<crate::Error>;

@@ -26,7 +26,15 @@ where
   }
 
   #[inline]
-  fn write_values<BUFFER>(&self, _: &mut BUFFER) -> Result<(), Self::Error>
+  fn write_insert_values<BUFFER>(&self, _: &mut BUFFER) -> Result<(), Self::Error>
+  where
+    BUFFER: cl_traits::String,
+  {
+    Ok(())
+  }
+
+  #[inline]
+  fn write_update_values<BUFFER>(&self, _: &mut BUFFER) -> Result<(), Self::Error>
   where
     BUFFER: cl_traits::String,
   {

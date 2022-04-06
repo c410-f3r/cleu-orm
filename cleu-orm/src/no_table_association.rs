@@ -67,4 +67,13 @@ where
   fn write_select_orders_by(&self, _: &mut B) -> Result<(), Self::Error> {
     Ok(())
   }
+
+  #[inline]
+  fn write_update(
+    &self,
+    _: &mut [Option<&'static str>; MAX_NODES_NUM],
+    _: &mut B,
+  ) -> Result<(), Self::Error> {
+    Ok(())
+  }
 }
