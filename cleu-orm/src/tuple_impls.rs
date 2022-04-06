@@ -1,9 +1,9 @@
 use crate::{
   buffer_try_push_str, buffer_write_fmt, FullTableAssociation, SelectLimit, SelectOrderBy,
-  SqlValue, SqlWriter, Table, TableAssociation, TableAssociations, TableDefs, TableField,
+  SqlValue, SqlWriter, Table, TableAssociationWrapper, TableAssociations, TableDefs, TableField,
   TableFields, TableSourceAssociation, MAX_NODES_NUM,
 };
-use cl_traits::{CapacityUpperBound, SingleTypeStorage};
+use cl_traits::SingleTypeStorage;
 use core::{array, fmt::Display};
 
 macro_rules! double_tuple_impls {
@@ -13,14 +13,11 @@ macro_rules! double_tuple_impls {
     }
   )+) => {
     $(
-      impl<'entity, ERR, $($T, $U,)+> TableAssociations for ($( (Table<'entity, $U>, $T, TableAssociation), )+)
+      impl<'entity, $($T, $U,)+> TableAssociations for ($( TableAssociationWrapper<'entity, $U, $T>, )+)
       where
-        ERR: From<crate::Error>,
         $(
-          $T: AsRef<[Table<'entity, $U>]>
-            + CapacityUpperBound
-            + SingleTypeStorage<Item = Table<'entity, $U>>,
-          $U: TableDefs<'entity, Error = ERR>,
+          $T: AsRef<[Table<'entity, $U>]> + SingleTypeStorage<Item = Table<'entity, $U>>,
+          $U: TableDefs<'entity>,
         )+
       {
         type FullTableAssociations = array::IntoIter<FullTableAssociation, $tuple_len>;
@@ -30,24 +27,22 @@ macro_rules! double_tuple_impls {
           [
             $(
               FullTableAssociation::new(
-                self.$idx.2,
+                self.$idx.association,
                 $U::TABLE_NAME,
                 $U::TABLE_NAME_ALIAS,
-                self.$idx.0.suffix()
+                self.$idx.guide.suffix()
               ),
             )+
           ].into_iter()
         }
       }
 
-      impl<'entity, BUFFER, ERR, $($T, $U,)+> SqlWriter<BUFFER> for ($( (Table<'entity, $U>, $T, TableAssociation), )+)
+      impl<'entity, BUFFER, ERR, $($T, $U,)+> SqlWriter<BUFFER> for ($( TableAssociationWrapper<'entity, $U, $T>, )+)
       where
         BUFFER: cl_traits::String,
         ERR: From<crate::Error>,
         $(
-          $T: AsRef<[Table<'entity, $U>]>
-            + CapacityUpperBound
-            + SingleTypeStorage<Item = Table<'entity, $U>>,
+          $T: AsRef<[Table<'entity, $U>]> + SingleTypeStorage<Item = Table<'entity, $U>>,
           $U: TableDefs<'entity, Error = ERR>,
           $U::Associations: SqlWriter<BUFFER, Error = ERR>,
         )+
@@ -66,15 +61,10 @@ macro_rules! double_tuple_impls {
         {
           $(
             if let Some(ref mut elem) = table_source_association.as_mut() {
-              *elem.source_field_mut() = self.$idx.2.to_id();
+              *elem.source_field_mut() = self.$idx.association.to_id();
             }
-            if self.$idx.1.capacity_upper_bound() == 0 {
-              self.$idx.0.write_insert(aux, buffer, table_source_association)?;
-            }
-            else {
-              for elem in self.$idx.1.as_ref() {
-                elem.write_insert(aux, buffer, table_source_association)?;
-              }
+            for elem in self.$idx.tables.as_ref() {
+              elem.write_insert(aux, buffer, table_source_association)?;
             }
           )+
           Ok(())
@@ -89,7 +79,7 @@ macro_rules! double_tuple_impls {
           where_cb: &mut impl FnMut(&mut BUFFER) -> Result<(), Self::Error>,
         ) -> Result<(), Self::Error> {
           $(
-            self.$idx.0.write_select(buffer, order_by, limit, where_cb)?;
+            self.$idx.guide.write_select(buffer, order_by, limit, where_cb)?;
           )+
           Ok(())
         }
@@ -100,7 +90,7 @@ macro_rules! double_tuple_impls {
             buffer: &mut BUFFER,
         ) -> Result<(), Self::Error> {
           $(
-            self.$idx.0.write_select_associations(buffer)?;
+            self.$idx.guide.write_select_associations(buffer)?;
           )+
           Ok(())
         }
@@ -111,7 +101,7 @@ macro_rules! double_tuple_impls {
             buffer: &mut BUFFER,
         ) -> Result<(), Self::Error> {
           $(
-            self.$idx.0.write_select_fields(buffer)?;
+            self.$idx.guide.write_select_fields(buffer)?;
           )+
           Ok(())
         }
@@ -119,7 +109,7 @@ macro_rules! double_tuple_impls {
         #[inline]
         fn write_select_orders_by(&self, buffer: &mut BUFFER) -> Result<(), Self::Error> {
           $(
-            self.$idx.0.write_select_orders_by(buffer)?;
+            self.$idx.guide.write_select_orders_by(buffer)?;
           )+
           Ok(())
         }
@@ -131,13 +121,8 @@ macro_rules! double_tuple_impls {
           buffer: &mut BUFFER,
         ) -> Result<(), Self::Error> {
           $(
-            if self.$idx.1.capacity_upper_bound() == 0 {
-              self.$idx.0.write_update(aux, buffer)?;
-            }
-            else {
-              for elem in self.$idx.1.as_ref() {
-                elem.write_update(aux, buffer)?;
-              }
+            for elem in self.$idx.tables.as_ref() {
+              elem.write_update(aux, buffer)?;
             }
           )+
           Ok(())

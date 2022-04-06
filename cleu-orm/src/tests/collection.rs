@@ -2,7 +2,7 @@
 
 use crate::{
   FromSuffixRslt, InitialInsertValue, NoTableAssociation, SelectLimit, SelectOrderBy, SqlWriter,
-  Suffix, Table, TableAssociation, TableDefs, TableField, MAX_NODES_NUM,
+  Suffix, Table, TableAssociation, TableAssociationWrapper, TableDefs, TableField, MAX_NODES_NUM,
 };
 use core::mem;
 
@@ -29,7 +29,7 @@ impl<'entity> TableDefs<'entity> for ATableDefs {
     (NoTableAssociation::new(), (TableField::new("name"),))
   }
 
-  fn update_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>) {
+  fn update_all_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>) {
     *table.id_field_mut().value_mut() = Some(&entity.id);
 
     *table.fields_mut().0.value_mut() = Some(&entity.name);
@@ -58,7 +58,7 @@ impl<'entity> TableDefs<'entity> for BTableDefs {
     (NoTableAssociation::new(), (TableField::new("name"),))
   }
 
-  fn update_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>) {
+  fn update_all_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>) {
     *table.id_field_mut().value_mut() = Some(&entity.id);
 
     *table.fields_mut().0.value_mut() = Some(&entity.name);
@@ -80,8 +80,8 @@ impl<'entity> TableDefs<'entity> for CTableDefs {
   const TABLE_NAME: &'static str = "c";
 
   type Associations = (
-    (Table<'entity, ATableDefs>, Vec<Table<'entity, ATableDefs>>, TableAssociation),
-    (Table<'entity, BTableDefs>, Vec<Table<'entity, BTableDefs>>, TableAssociation),
+    TableAssociationWrapper<'entity, ATableDefs, Vec<Table<'entity, ATableDefs>>>,
+    TableAssociationWrapper<'entity, BTableDefs, Vec<Table<'entity, BTableDefs>>>,
   );
   type Entity = C;
   type Error = ();
@@ -91,30 +91,38 @@ impl<'entity> TableDefs<'entity> for CTableDefs {
   fn type_instances(suffix: Suffix) -> FromSuffixRslt<'entity, Self> {
     (
       (
-        (Table::new(suffix + 1), vec![], TableAssociation::new("id", "id_a")),
-        (Table::new(suffix + 2), vec![], TableAssociation::new("id", "id_b")),
+        TableAssociationWrapper {
+          association: TableAssociation::new("id", "id_a"),
+          guide: Table::new(suffix + 1),
+          tables: vec![],
+        },
+        TableAssociationWrapper {
+          association: TableAssociation::new("id", "id_b"),
+          guide: Table::new(suffix + 2),
+          tables: vec![],
+        },
       ),
       (TableField::new("name"),),
     )
   }
 
-  fn update_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>) {
+  fn update_all_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>) {
     *table.id_field_mut().value_mut() = Some(&entity.id);
 
     *table.fields_mut().0.value_mut() = Some(&entity.name);
 
-    table.associations_mut().0.1.clear();
+    table.associations_mut().0.tables.clear();
     for a in entity.r#as.iter() {
-      let mut elem = Table::new(0);
-      elem.update_table_fields(a);
-      table.associations_mut().0.1.push(elem);
+      let mut elem = Table::new(table.suffix() + 1);
+      elem.update_all_table_fields(a);
+      table.associations_mut().0.tables.push(elem);
     }
 
-    table.associations_mut().1.1.clear();
+    table.associations_mut().1.tables.clear();
     for b in entity.bs.iter() {
-      let mut elem = Table::new(0);
-      elem.update_table_fields(b);
-      table.associations_mut().1.1.push(elem);
+      let mut elem = Table::new(table.suffix() + 2);
+      elem.update_all_table_fields(b);
+      table.associations_mut().1.tables.push(elem);
     }
   }
 }
@@ -140,7 +148,7 @@ fn update_some_values_has_correct_behavior() {
 
   let mut elem = Table::new(0);
   *elem.id_field_mut().value_mut() = Some(&c3.r#as[0].id);
-  c_table_defs.associations_mut().0.1.push(elem);
+  c_table_defs.associations_mut().0.tables.push(elem);
 
   c_table_defs.write_update(&mut [Default::default(); MAX_NODES_NUM], &mut buffer).unwrap();
   assert_eq!(&buffer, r#"UPDATE c SET id='3' WHERE id='3';UPDATE a SET id='1' WHERE id='1';"#);
@@ -177,7 +185,7 @@ fn write_collection_has_correct_params() {
   c_table_defs.write_update(&mut [Default::default(); MAX_NODES_NUM], &mut buffer).unwrap();
   assert_eq!(&buffer, r#""#);
 
-  c_table_defs.update_table_fields(&c3);
+  c_table_defs.update_all_table_fields(&c3);
 
   buffer.clear();
   c_table_defs

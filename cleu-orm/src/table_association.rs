@@ -1,5 +1,5 @@
 /// Table association and its associated Rust type
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TableAssociation {
   from_id: &'static str,
   to_id: &'static str,

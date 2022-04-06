@@ -76,10 +76,10 @@ where
     self.suffix
   }
 
-  /// Shortcut of `<T as TableDefs<'_>>::update_table_fields(&entity, &mut table)`
+  /// Shortcut for `<T as TableDefs<'_>>::update_all_table_fields(&entity, &mut table)`
   #[inline]
-  pub fn update_table_fields(&mut self, entity: &'entity TD::Entity) {
-    TD::update_table_fields(entity, self)
+  pub fn update_all_table_fields(&mut self, entity: &'entity TD::Entity) {
+    TD::update_all_table_fields(entity, self)
   }
 
   #[inline]

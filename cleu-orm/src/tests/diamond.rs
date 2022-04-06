@@ -5,7 +5,7 @@
 
 use crate::{
   FromSuffixRslt, InitialInsertValue, NoTableAssociation, SelectLimit, SelectOrderBy, SqlWriter,
-  Suffix, Table, TableAssociation, TableDefs, TableField, MAX_NODES_NUM,
+  Suffix, Table, TableAssociation, TableAssociationWrapper, TableDefs, TableField, MAX_NODES_NUM,
 };
 use core::mem;
 
@@ -36,7 +36,7 @@ impl<'entity> TableDefs<'entity> for ATableDefs {
     (NoTableAssociation::new(), (TableField::new("name"),))
   }
 
-  fn update_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>) {
+  fn update_all_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>) {
     *table.id_field_mut().value_mut() = Some(&entity.id);
 
     *table.fields_mut().0.value_mut() = Some(&entity.name);
@@ -56,7 +56,7 @@ impl<'entity> TableDefs<'entity> for BTableDefs {
   const TABLE_NAME: &'static str = "b";
 
   type Associations =
-    ((Table<'entity, ATableDefs>, [Table<'entity, ATableDefs>; 0], TableAssociation),);
+    (TableAssociationWrapper<'entity, ATableDefs, [Table<'entity, ATableDefs>; 1]>,);
   type Entity = B;
   type Error = ();
   type Fields = (TableField<(), &'static str>,);
@@ -64,17 +64,21 @@ impl<'entity> TableDefs<'entity> for BTableDefs {
 
   fn type_instances(suffix: Suffix) -> FromSuffixRslt<'entity, Self> {
     (
-      ((Table::new(suffix + 1), [], TableAssociation::new("id", "id_b")),),
+      (TableAssociationWrapper {
+        association: TableAssociation::new("id", "id_b"),
+        guide: Table::new(suffix + 1),
+        tables: [Table::new(suffix + 1)],
+      },),
       (TableField::new("name"),),
     )
   }
 
-  fn update_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>) {
+  fn update_all_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>) {
     *table.id_field_mut().value_mut() = Some(&entity.id);
 
     *table.fields_mut().0.value_mut() = Some(&entity.name);
 
-    table.associations_mut().0.0.update_table_fields(&entity.a);
+    table.associations_mut().0.tables[0].update_all_table_fields(&entity.a);
   }
 }
 
@@ -91,7 +95,7 @@ impl<'entity> TableDefs<'entity> for CTableDefs {
   const TABLE_NAME: &'static str = "c";
 
   type Associations =
-    ((Table<'entity, ATableDefs>, [Table<'entity, ATableDefs>; 0], TableAssociation),);
+    (TableAssociationWrapper<'entity, ATableDefs, [Table<'entity, ATableDefs>; 1]>,);
   type Entity = C;
   type Error = ();
   type Fields = (TableField<(), &'static str>,);
@@ -99,17 +103,21 @@ impl<'entity> TableDefs<'entity> for CTableDefs {
 
   fn type_instances(suffix: Suffix) -> FromSuffixRslt<'entity, Self> {
     (
-      ((Table::new(suffix + 1), [], TableAssociation::new("id", "id_c")),),
+      (TableAssociationWrapper {
+        association: TableAssociation::new("id", "id_c"),
+        guide: Table::new(suffix + 1),
+        tables: [Table::new(suffix + 1)],
+      },),
       (TableField::new("name"),),
     )
   }
 
-  fn update_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>) {
+  fn update_all_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>) {
     *table.id_field_mut().value_mut() = Some(&entity.id);
 
     *table.fields_mut().0.value_mut() = Some(&entity.name);
 
-    table.associations_mut().0.0.update_table_fields(&entity.a);
+    table.associations_mut().0.tables[0].update_all_table_fields(&entity.a);
   }
 }
 
@@ -127,8 +135,8 @@ impl<'entity> TableDefs<'entity> for DTableDefs {
   const TABLE_NAME: &'static str = "d";
 
   type Associations = (
-    (Table<'entity, BTableDefs>, [Table<'entity, BTableDefs>; 0], TableAssociation),
-    (Table<'entity, CTableDefs>, [Table<'entity, CTableDefs>; 0], TableAssociation),
+    TableAssociationWrapper<'entity, BTableDefs, [Table<'entity, BTableDefs>; 1]>,
+    TableAssociationWrapper<'entity, CTableDefs, [Table<'entity, CTableDefs>; 1]>,
   );
   type Entity = D;
   type Error = ();
@@ -138,20 +146,28 @@ impl<'entity> TableDefs<'entity> for DTableDefs {
   fn type_instances(suffix: Suffix) -> FromSuffixRslt<'entity, Self> {
     (
       (
-        (Table::new(suffix + 1), [], TableAssociation::new("id", "id_d")),
-        (Table::new(suffix + 2), [], TableAssociation::new("id", "id_d")),
+        TableAssociationWrapper {
+          association: TableAssociation::new("id", "id_d"),
+          guide: Table::new(suffix + 1),
+          tables: [Table::new(suffix + 1)],
+        },
+        TableAssociationWrapper {
+          association: TableAssociation::new("id", "id_d"),
+          guide: Table::new(suffix + 2),
+          tables: [Table::new(suffix + 2)],
+        },
       ),
       (TableField::new("name"),),
     )
   }
 
-  fn update_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>) {
+  fn update_all_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>) {
     *table.id_field_mut().value_mut() = Some(&entity.id);
 
     *table.fields_mut().0.value_mut() = Some(&entity.name);
 
-    table.associations_mut().0.0.update_table_fields(&entity.b);
-    table.associations_mut().1.0.update_table_fields(&entity.c);
+    table.associations_mut().0.tables[0].update_all_table_fields(&entity.b);
+    table.associations_mut().1.tables[0].update_all_table_fields(&entity.c);
   }
 }
 
@@ -159,9 +175,9 @@ impl<'entity> TableDefs<'entity> for DTableDefs {
 #[test]
 fn assert_sizes() {
   assert_eq!(mem::size_of::<Table<'_, ATableDefs>>(), 64);
-  assert_eq!(mem::size_of::<Table<'_, BTableDefs>>(), 160);
-  assert_eq!(mem::size_of::<Table<'_, CTableDefs>>(), 160);
-  assert_eq!(mem::size_of::<Table<'_, DTableDefs>>(), 448);
+  assert_eq!(mem::size_of::<Table<'_, BTableDefs>>(), 224);
+  assert_eq!(mem::size_of::<Table<'_, CTableDefs>>(), 224);
+  assert_eq!(mem::size_of::<Table<'_, DTableDefs>>(), 1024);
 }
 
 #[test]
@@ -177,7 +193,7 @@ fn multi_referred_table_has_correct_statements() {
     r#"SELECT "d0".id AS d0__id,"d0".name AS d0__name,"b1".id AS b1__id,"b1".name AS b1__name,"a2".id AS a2__id,"a2".name AS a2__name,"c2".id AS c2__id,"c2".name AS c2__name,"a3".id AS a3__id,"a3".name AS a3__name FROM "d" AS "d0" LEFT JOIN "b" AS "b1" ON "d0".id = "b1".id_d LEFT JOIN "c" AS "c2" ON "d0".id = "c2".id_d LEFT JOIN "a" AS "a2" ON "b1".id = "a2".id_b LEFT JOIN "a" AS "a3" ON "c2".id = "a3".id_c  ORDER BY "d0".id,"b1".id,"a2".id,"c2".id,"a3".id ASC LIMIT ALL"#
   );
 
-  d_table_defs.update_table_fields(&D);
+  d_table_defs.update_all_table_fields(&D);
 
   buffer.clear();
   d_table_defs
@@ -212,7 +228,7 @@ fn referred_table_has_correct_statements() {
     r#"SELECT "b0".id AS b0__id,"b0".name AS b0__name,"a1".id AS a1__id,"a1".name AS a1__name FROM "b" AS "b0" LEFT JOIN "a" AS "a1" ON "b0".id = "a1".id_b  ORDER BY "b0".id,"a1".id ASC LIMIT ALL"#
   );
 
-  b_table_defs.update_table_fields(&B);
+  b_table_defs.update_all_table_fields(&B);
 
   buffer.clear();
   b_table_defs
@@ -247,7 +263,7 @@ fn standalone_table_has_correct_statements() {
     r#"SELECT "a0".id AS a0__id,"a0".name AS a0__name FROM "a" AS "a0"  ORDER BY "a0".id ASC LIMIT ALL"#
   );
 
-  a_table_defs.update_table_fields(&A);
+  a_table_defs.update_all_table_fields(&A);
 
   buffer.clear();
   a_table_defs

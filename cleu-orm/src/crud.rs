@@ -31,7 +31,7 @@ where
     TD::Entity: FromRowsSuffix<B, Error = TD::Error>,
     TD::Associations: SqlWriter<B, Error = TD::Error>,
   {
-    self.update_table_fields(table);
+    self.update_all_table_fields(table);
     self.write_insert::<InitialInsertValue>(
       &mut [Default::default(); MAX_NODES_NUM],
       buffer,

@@ -25,7 +25,7 @@ pub trait TableDefs<'entity> {
   fn type_instances(suffix: Suffix) -> FromSuffixRslt<'entity, Self>;
 
   /// Updates the inner instance values that are used by some CRUD operations
-  fn update_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>)
+  fn update_all_table_fields(entity: &'entity Self::Entity, table: &mut Table<'entity, Self>)
   where
     Self: Sized;
 }
