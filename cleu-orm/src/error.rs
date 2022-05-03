@@ -11,14 +11,12 @@ pub enum Error {
   Fmt(fmt::Error),
   /// Some internal operation found a hash collision of two table ids (likely) or a hash collision
   /// due to a number of nested associations larger than `MAX_NODES_NUM` (unlikely).
-  HashCollision(usize, &'static str, &'static str),
+  HashCollision(u64, &'static str, &'static str),
   /// No row was returned by the database
   NoDatabaseRowResult,
   /// Errors of the `sqlx_core` crate
   #[cfg(any(feature = "sqlx-postgres", feature = "sqlx-runtime-tokio-native-tls"))]
   Sqlx(sqlx_core::error::Error),
-  /// Out of bound index used in an auxiliary structure meaning a programming error
-  UnknownAuxIdx(usize),
 }
 
 impl From<Error> for () {

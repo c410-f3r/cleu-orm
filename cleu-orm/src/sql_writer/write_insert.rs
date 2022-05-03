@@ -1,6 +1,7 @@
 use crate::{
-  buffer_try_push_str, buffer_write_fmt, sql_writer::SqlWriterLogic, truncate_if_ends_with_char,
-  SqlValue, SqlWriter, Table, TableDefs, TableFields, TableSourceAssociation, MAX_NODES_NUM,
+  buffer_try_push_str, buffer_write_fmt, node_was_already_visited, sql_writer::SqlWriterLogic,
+  truncate_if_ends_with_char, AuxNodes, SqlValue, SqlWriter, Table, TableDefs, TableFields,
+  TableSourceAssociation,
 };
 use core::fmt::Display;
 
@@ -13,7 +14,7 @@ where
 {
   #[inline]
   pub(crate) fn write_insert<'value, V>(
-    aux: &mut [Option<&'static str>; MAX_NODES_NUM],
+    aux: &mut AuxNodes,
     buffer: &mut B,
     table: &Table<'entity, TD>,
     tsa: &mut Option<TableSourceAssociation<'value, V>>,
@@ -21,17 +22,8 @@ where
   where
     V: Display,
   {
-    let idx = table.instance_idx();
-    let table_name_opt = aux.get_mut(idx).ok_or(crate::Error::UnknownAuxIdx(idx))?;
-
-    if let Some(table_name) = *table_name_opt {
-      if table_name == TD::TABLE_NAME {
-        return Ok(());
-      } else {
-        return Err(crate::Error::HashCollision(idx, table_name, TD::TABLE_NAME).into());
-      }
-    } else {
-      *table_name_opt = Some(TD::TABLE_NAME);
+    if node_was_already_visited(aux, table)? {
+      return Ok(());
     }
 
     let elem_opt = || {
@@ -52,6 +44,7 @@ where
     } else {
       Self::write_insert_manager(buffer, table, |_| Ok(()), |_| Ok(()))?;
     }
+
     let mut new_tsa = table.id_field().value().as_ref().map(TableSourceAssociation::new);
     table.associations().write_insert(aux, buffer, &mut new_tsa)?;
 

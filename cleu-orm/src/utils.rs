@@ -1,4 +1,4 @@
-use crate::{FullTableAssociation, Suffix};
+use crate::{AuxNodes, FullTableAssociation, Suffix, Table, TableDefs};
 use core::fmt::Arguments;
 
 /// Shortcut of `buffer.try_push(...)`
@@ -8,7 +8,7 @@ where
   B: cl_traits::String,
   E: From<crate::Error>,
 {
-  buffer.push(string).map_err(|err| E::from(err.into()))
+  buffer.push(string).map_err(|err| E::from(crate::Error::ClTraits(err)))
 }
 
 /// Shortcut of `buffer.write_fmt(...)`
@@ -18,7 +18,7 @@ where
   B: cl_traits::String,
   E: From<crate::Error>,
 {
-  buffer.write_fmt(args).map_err(|err| E::from(err.into()))
+  buffer.write_fmt(args).map_err(|err| E::from(crate::Error::Fmt(err)))
 }
 
 /// Writes {table}{suffix}__{field}` into a buffer.
@@ -34,6 +34,30 @@ where
 {
   buffer.write_fmt(format_args!("{table}{suffix}__{field}",))?;
   Ok(())
+}
+
+pub(crate) fn node_was_already_visited<'entity, TD>(
+  aux: &mut AuxNodes,
+  table: &Table<'entity, TD>,
+) -> crate::Result<bool>
+where
+  TD: TableDefs<'entity>,
+{
+  let hash = table.instance_hash();
+  match aux
+    .binary_search_by(|&(ref local_hash, _)| local_hash.cmp(&hash))
+    .and_then(|idx| aux.get(idx).map(|elem| elem.1).ok_or(idx))
+  {
+    Err(could_be_idx) => aux.insert(could_be_idx, (hash, TD::TABLE_NAME)),
+    Ok(existent_table_name) => {
+      if existent_table_name == TD::TABLE_NAME {
+        return Ok(true);
+      } else {
+        return Err(crate::Error::HashCollision(hash, existent_table_name, TD::TABLE_NAME));
+      }
+    }
+  }
+  Ok(false)
 }
 
 #[inline]

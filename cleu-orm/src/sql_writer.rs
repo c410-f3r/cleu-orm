@@ -1,11 +1,12 @@
+mod write_delete;
 mod write_insert;
 mod write_select;
 mod write_update;
 
 use crate::{
-  buffer_try_push_str, write_full_select_field, write_select_join, write_select_order_by,
+  buffer_try_push_str, write_full_select_field, write_select_join, write_select_order_by, AuxNodes,
   SelectLimit, SelectOrderBy, Table, TableAssociations, TableDefs, TableFields,
-  TableSourceAssociation, MAX_NODES_NUM,
+  TableSourceAssociation,
 };
 use core::{fmt::Display, marker::PhantomData};
 
@@ -17,10 +18,13 @@ where
   /// See [crate::Error].
   type Error: From<crate::Error>;
 
+  /// Writes an entire DELETE command
+  fn write_delete(&self, aux: &mut AuxNodes, buffer: &mut B) -> Result<(), Self::Error>;
+
   /// Writes an entire INSERT command
   fn write_insert<'value, V>(
     &self,
-    aux: &mut [Option<&'static str>; MAX_NODES_NUM],
+    aux: &mut AuxNodes,
     buffer: &mut B,
     table_source_association: &mut Option<TableSourceAssociation<'value, V>>,
   ) -> Result<(), Self::Error>
@@ -46,11 +50,7 @@ where
   fn write_select_orders_by(&self, buffer: &mut B) -> Result<(), Self::Error>;
 
   /// Writes an entire UPDATE command
-  fn write_update(
-    &self,
-    aux: &mut [Option<&'static str>; MAX_NODES_NUM],
-    buffer: &mut B,
-  ) -> Result<(), Self::Error>;
+  fn write_update(&self, aux: &mut AuxNodes, buffer: &mut B) -> Result<(), Self::Error>;
 }
 
 impl<'entity, B, TD> SqlWriter<B> for Table<'entity, TD>
@@ -63,9 +63,14 @@ where
   type Error = TD::Error;
 
   #[inline]
+  fn write_delete(&self, aux: &mut AuxNodes, buffer: &mut B) -> Result<(), Self::Error> {
+    SqlWriterLogic::write_delete(aux, buffer, self)
+  }
+
+  #[inline]
   fn write_insert<'value, V>(
     &self,
-    aux: &mut [Option<&'static str>; MAX_NODES_NUM],
+    aux: &mut AuxNodes,
     buffer: &mut B,
     tsa: &mut Option<TableSourceAssociation<'value, V>>,
   ) -> Result<(), Self::Error>
@@ -129,11 +134,7 @@ where
   }
 
   #[inline]
-  fn write_update(
-    &self,
-    aux: &mut [Option<&'static str>; MAX_NODES_NUM],
-    buffer: &mut B,
-  ) -> Result<(), Self::Error> {
+  fn write_update(&self, aux: &mut AuxNodes, buffer: &mut B) -> Result<(), Self::Error> {
     SqlWriterLogic::write_update(aux, buffer, self)
   }
 }

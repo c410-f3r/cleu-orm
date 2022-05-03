@@ -1,4 +1,4 @@
-use crate::{FxHasher, Suffix, TableDefs, TableField, MAX_NODES_NUM};
+use crate::{FxHasher, Suffix, TableDefs, TableField};
 use core::{
   hash::{Hash, Hasher},
   marker::PhantomData,
@@ -83,28 +83,13 @@ where
   }
 
   #[inline]
-  pub(crate) fn instance_idx(&self) -> usize {
+  pub(crate) fn instance_hash(&self) -> u64 {
     let mut fx_hasher = FxHasher::default();
     TD::PRIMARY_KEY_NAME.hash(&mut fx_hasher);
     TD::TABLE_NAME.hash(&mut fx_hasher);
     TD::TABLE_NAME_ALIAS.hash(&mut fx_hasher);
     self.id_field().value().hash(&mut fx_hasher);
-    let [a, b, c, d, e, f, g, h] = fx_hasher.finish().to_ne_bytes();
-    #[cfg(target_pointer_width = "16")]
-    let rslt = usize::from_ne_bytes([
-      a.wrapping_add(b).wrapping_add(c).wrapping_add(d),
-      e.wrapping_add(f).wrapping_add(g).wrapping_add(h),
-    ]);
-    #[cfg(target_pointer_width = "32")]
-    let rslt = usize::from_ne_bytes([
-      a.wrapping_add(b),
-      c.wrapping_add(d),
-      e.wrapping_add(f),
-      g.wrapping_add(h),
-    ]);
-    #[cfg(target_pointer_width = "64")]
-    let rslt = usize::from_ne_bytes([a, b, c, d, e, f, g, h]);
-    rslt.wrapping_rem(MAX_NODES_NUM)
+    fx_hasher.finish()
   }
 }
 

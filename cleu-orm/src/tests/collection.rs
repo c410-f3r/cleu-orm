@@ -2,7 +2,7 @@
 
 use crate::{
   FromSuffixRslt, InitialInsertValue, NoTableAssociation, SelectLimit, SelectOrderBy, SqlWriter,
-  Suffix, Table, TableAssociation, TableAssociationWrapper, TableDefs, TableField, MAX_NODES_NUM,
+  Suffix, Table, TableAssociation, TableAssociationWrapper, TableDefs, TableField,
 };
 use core::mem;
 
@@ -150,7 +150,7 @@ fn update_some_values_has_correct_behavior() {
   *elem.id_field_mut().value_mut() = Some(&c3.r#as[0].id);
   c_table_defs.associations_mut().0.tables.push(elem);
 
-  c_table_defs.write_update(&mut [Default::default(); MAX_NODES_NUM], &mut buffer).unwrap();
+  c_table_defs.write_update(&mut <_>::default(), &mut buffer).unwrap();
   assert_eq!(&buffer, r#"UPDATE c SET id='3' WHERE id='3';UPDATE a SET id='1' WHERE id='1';"#);
 }
 
@@ -163,12 +163,11 @@ fn write_collection_has_correct_params() {
   let mut buffer = String::new();
   let mut c_table_defs = Table::<CTableDefs>::default();
 
+  c_table_defs.write_delete(&mut <_>::default(), &mut buffer).unwrap();
+  assert_eq!(&buffer, r#""#);
+
   c_table_defs
-    .write_insert::<InitialInsertValue>(
-      &mut [Default::default(); MAX_NODES_NUM],
-      &mut buffer,
-      &mut None,
-    )
+    .write_insert::<InitialInsertValue>(&mut <_>::default(), &mut buffer, &mut None)
     .unwrap();
   assert_eq!(&buffer, r#""#);
 
@@ -182,18 +181,21 @@ fn write_collection_has_correct_params() {
   );
 
   buffer.clear();
-  c_table_defs.write_update(&mut [Default::default(); MAX_NODES_NUM], &mut buffer).unwrap();
+  c_table_defs.write_update(&mut <_>::default(), &mut buffer).unwrap();
   assert_eq!(&buffer, r#""#);
 
   c_table_defs.update_all_table_fields(&c3);
 
   buffer.clear();
+  c_table_defs.write_delete(&mut <_>::default(), &mut buffer).unwrap();
+  assert_eq!(
+    &buffer,
+    r#"DELETE FROM a WHERE id='1';DELETE FROM a WHERE id='2';DELETE FROM c WHERE id='3';"#
+  );
+
+  buffer.clear();
   c_table_defs
-    .write_insert::<InitialInsertValue>(
-      &mut [Default::default(); MAX_NODES_NUM],
-      &mut buffer,
-      &mut None,
-    )
+    .write_insert::<InitialInsertValue>(&mut <_>::default(), &mut buffer, &mut None)
     .unwrap();
   assert_eq!(
     &buffer,
@@ -210,7 +212,7 @@ fn write_collection_has_correct_params() {
   );
 
   buffer.clear();
-  c_table_defs.write_update(&mut [Default::default(); MAX_NODES_NUM], &mut buffer).unwrap();
+  c_table_defs.write_update(&mut <_>::default(), &mut buffer).unwrap();
   assert_eq!(
     &buffer,
     r#"UPDATE c SET id='3',name='foo3' WHERE id='3';UPDATE a SET id='1',name='foo1' WHERE id='1';UPDATE a SET id='2',name='foo2' WHERE id='2';"#

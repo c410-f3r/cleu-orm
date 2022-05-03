@@ -1,6 +1,6 @@
 use crate::{
-  FullTableAssociation, SelectLimit, SelectOrderBy, SqlWriter, TableAssociations,
-  TableSourceAssociation, MAX_NODES_NUM,
+  AuxNodes, FullTableAssociation, SelectLimit, SelectOrderBy, SqlWriter, TableAssociations,
+  TableSourceAssociation,
 };
 use core::{array, marker::PhantomData};
 
@@ -33,9 +33,14 @@ where
   type Error = E;
 
   #[inline]
+  fn write_delete(&self, _: &mut AuxNodes, _: &mut B) -> Result<(), Self::Error> {
+    Ok(())
+  }
+
+  #[inline]
   fn write_insert<'value, V>(
     &self,
-    _: &mut [Option<&'static str>; MAX_NODES_NUM],
+    _: &mut AuxNodes,
     _: &mut B,
     _: &mut Option<TableSourceAssociation<'value, V>>,
   ) -> Result<(), Self::Error> {
@@ -69,11 +74,7 @@ where
   }
 
   #[inline]
-  fn write_update(
-    &self,
-    _: &mut [Option<&'static str>; MAX_NODES_NUM],
-    _: &mut B,
-  ) -> Result<(), Self::Error> {
+  fn write_update(&self, _: &mut AuxNodes, _: &mut B) -> Result<(), Self::Error> {
     Ok(())
   }
 }

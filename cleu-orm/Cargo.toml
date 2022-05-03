@@ -3,6 +3,7 @@ arrayvec = { default-features = false, optional = true, version = "0.7" }
 cl-traits = { default-features = false, features = ["alloc"], git = "https://github.com/c410-f3r/cl-traits", version = "6.0" }
 cleu-orm-derive = { default-features = false, optional = true, path = "../cleu-orm-derive", version = "0.1.0" }
 rust_decimal = { default-features = false, optional = true, version = "1.0" }
+smallvec = { default-features = false, features = ["const_generics", "union"], version = "1.0" }
 sqlx-core = { default-features = false, optional = true, version = "0.5" }
 
 [features]

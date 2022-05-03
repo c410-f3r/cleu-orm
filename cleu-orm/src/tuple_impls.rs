@@ -1,7 +1,7 @@
 use crate::{
-  buffer_try_push_str, buffer_write_fmt, FullTableAssociation, SelectLimit, SelectOrderBy,
-  SqlValue, SqlWriter, Table, TableAssociationWrapper, TableAssociations, TableDefs, TableField,
-  TableFields, TableSourceAssociation, MAX_NODES_NUM,
+  buffer_try_push_str, buffer_write_fmt, AuxNodes, FullTableAssociation, SelectLimit,
+  SelectOrderBy, SqlValue, SqlWriter, Table, TableAssociationWrapper, TableAssociations, TableDefs,
+  TableField, TableFields, TableSourceAssociation,
 };
 use cl_traits::SingleTypeStorage;
 use core::{array, fmt::Display};
@@ -50,9 +50,23 @@ macro_rules! double_tuple_impls {
         type Error = ERR;
 
         #[inline]
+        fn write_delete(
+          &self,
+          aux: &mut AuxNodes,
+          buffer: &mut BUFFER,
+        ) -> Result<(), Self::Error> {
+          $(
+            for elem in self.$idx.tables.as_ref() {
+              elem.write_delete(aux, buffer)?;
+            }
+          )+
+          Ok(())
+        }
+
+        #[inline]
         fn write_insert<'value, VALUE>(
           &self,
-          aux: &mut [Option<&'static str>; MAX_NODES_NUM],
+          aux: &mut AuxNodes,
           buffer: &mut BUFFER,
           table_source_association: &mut Option<TableSourceAssociation<'value, VALUE>>
         ) -> Result<(), Self::Error>
@@ -117,7 +131,7 @@ macro_rules! double_tuple_impls {
         #[inline]
         fn write_update(
           &self,
-          aux: &mut [Option<&'static str>; MAX_NODES_NUM],
+          aux: &mut AuxNodes,
           buffer: &mut BUFFER,
         ) -> Result<(), Self::Error> {
           $(

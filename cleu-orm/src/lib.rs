@@ -61,5 +61,4 @@ pub type Result<T> = core::result::Result<T, Error>;
 /// Used by some operations to identify different tables
 pub type Suffix = u32;
 
-/// The maximum number of nested associations some inner operations are allowed to have
-pub const MAX_NODES_NUM: usize = 1024 * 16;
+type AuxNodes = smallvec::SmallVec<[(u64, &'static str); 64]>;

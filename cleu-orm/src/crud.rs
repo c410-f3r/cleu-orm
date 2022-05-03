@@ -6,7 +6,6 @@ mod utils;
 
 use crate::{
   FromRowsSuffix, InitialInsertValue, SelectLimit, SelectOrderBy, SqlWriter, Table, TableDefs,
-  MAX_NODES_NUM,
 };
 use sqlx_core::{executor::Executor, postgres::PgPool};
 pub use utils::*;
@@ -32,11 +31,7 @@ where
     TD::Associations: SqlWriter<B, Error = TD::Error>,
   {
     self.update_all_table_fields(table);
-    self.write_insert::<InitialInsertValue>(
-      &mut [Default::default(); MAX_NODES_NUM],
-      buffer,
-      &mut None,
-    )?;
+    self.write_insert::<InitialInsertValue>(&mut <_>::default(), buffer, &mut None)?;
     let _ = pool.execute(buffer.as_ref()).await.map_err(Into::into)?;
     Ok(())
   }

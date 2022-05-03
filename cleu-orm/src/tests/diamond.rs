@@ -1,3 +1,31 @@
+// CREATE TABLE d (
+//   id INT PRIMARY KEY NOT NULL,
+//   name VARCHAR(64) NOT NULL
+// );
+//
+// CREATE TABLE c (
+//   id INT PRIMARY KEY NOT NULL,
+//   id_d INT NOT NULL,
+//   name VARCHAR(64) NOT NULL
+// );
+// ALTER TABLE c ADD FOREIGN KEY (id_d) REFERENCES d(id);
+//
+// CREATE TABLE b (
+//   id INT PRIMARY KEY NOT NULL,
+//   id_d INT NOT NULL,
+//   name VARCHAR(64) NOT NULL
+// );
+// ALTER TABLE b ADD FOREIGN KEY (id_d) REFERENCES d(id);
+//
+// CREATE TABLE a (
+//   id INT PRIMARY KEY NOT NULL,
+//   id_b INT NOT NULL,
+//   id_c INT NOT NULL,
+//   name VARCHAR(64) NOT NULL
+// );
+// ALTER TABLE a ADD FOREIGN KEY (id_b) REFERENCES b(id);
+// ALTER TABLE a ADD FOREIGN KEY (id_c) REFERENCES c(id);
+//
 // D
 // |--> B |
 // |--> C |
@@ -5,7 +33,7 @@
 
 use crate::{
   FromSuffixRslt, InitialInsertValue, NoTableAssociation, SelectLimit, SelectOrderBy, SqlWriter,
-  Suffix, Table, TableAssociation, TableAssociationWrapper, TableDefs, TableField, MAX_NODES_NUM,
+  Suffix, Table, TableAssociation, TableAssociationWrapper, TableDefs, TableField,
 };
 use core::mem;
 
@@ -196,20 +224,25 @@ fn multi_referred_table_has_correct_statements() {
   d_table_defs.update_all_table_fields(&D);
 
   buffer.clear();
+  d_table_defs.write_delete(&mut <_>::default(), &mut buffer).unwrap();
+  assert_eq!(
+    &buffer,
+    r#"DELETE FROM a WHERE id='1';DELETE FROM b WHERE id='2';DELETE FROM c WHERE id='3';DELETE FROM d WHERE id='4';"#
+  );
+
+  buffer.clear();
   d_table_defs
-    .write_insert::<InitialInsertValue>(
-      &mut [Default::default(); MAX_NODES_NUM],
-      &mut buffer,
-      &mut None,
-    )
+    .write_insert::<InitialInsertValue>(&mut <_>::default(), &mut buffer, &mut None)
     .unwrap();
   assert_eq!(
     &buffer,
+    // FIXME
+    // INSERT INTO "d" (id,name) VALUES ('4','foo4');INSERT INTO "b" (id,name,id_d) VALUES ('2','foo2','4');INSERT INTO "c" (id,name,id_d) VALUES ('3','foo3','4');INSERT INTO "a" (id,name,id_b,id_c) VALUES ('1','foo1','2','3');
     r#"INSERT INTO "d" (id,name) VALUES ('4','foo4');INSERT INTO "b" (id,name,id_d) VALUES ('2','foo2','4');INSERT INTO "a" (id,name,id_b) VALUES ('1','foo1','2');INSERT INTO "c" (id,name,id_d) VALUES ('3','foo3','4');"#
   );
 
   buffer.clear();
-  d_table_defs.write_update(&mut [Default::default(); MAX_NODES_NUM], &mut buffer).unwrap();
+  d_table_defs.write_update(&mut <_>::default(), &mut buffer).unwrap();
   assert_eq!(
     &buffer,
     r#"UPDATE d SET id='4',name='foo4' WHERE id='4';UPDATE b SET id='2',name='foo2' WHERE id='2';UPDATE a SET id='1',name='foo1' WHERE id='1';UPDATE c SET id='3',name='foo3' WHERE id='3';"#
@@ -231,12 +264,12 @@ fn referred_table_has_correct_statements() {
   b_table_defs.update_all_table_fields(&B);
 
   buffer.clear();
+  b_table_defs.write_delete(&mut <_>::default(), &mut buffer).unwrap();
+  assert_eq!(&buffer, r#"DELETE FROM a WHERE id='1';DELETE FROM b WHERE id='2';"#);
+
+  buffer.clear();
   b_table_defs
-    .write_insert::<InitialInsertValue>(
-      &mut [Default::default(); MAX_NODES_NUM],
-      &mut buffer,
-      &mut None,
-    )
+    .write_insert::<InitialInsertValue>(&mut <_>::default(), &mut buffer, &mut None)
     .unwrap();
   assert_eq!(
     &buffer,
@@ -244,7 +277,7 @@ fn referred_table_has_correct_statements() {
   );
 
   buffer.clear();
-  b_table_defs.write_update(&mut [Default::default(); MAX_NODES_NUM], &mut buffer).unwrap();
+  b_table_defs.write_update(&mut <_>::default(), &mut buffer).unwrap();
   assert_eq!(
     &buffer,
     r#"UPDATE b SET id='2',name='foo2' WHERE id='2';UPDATE a SET id='1',name='foo1' WHERE id='1';"#
@@ -266,16 +299,16 @@ fn standalone_table_has_correct_statements() {
   a_table_defs.update_all_table_fields(&A);
 
   buffer.clear();
+  a_table_defs.write_delete(&mut <_>::default(), &mut buffer).unwrap();
+  assert_eq!(&buffer, r#"DELETE FROM a WHERE id='1';"#);
+
+  buffer.clear();
   a_table_defs
-    .write_insert::<InitialInsertValue>(
-      &mut [Default::default(); MAX_NODES_NUM],
-      &mut buffer,
-      &mut None,
-    )
+    .write_insert::<InitialInsertValue>(&mut <_>::default(), &mut buffer, &mut None)
     .unwrap();
   assert_eq!(&buffer, r#"INSERT INTO "a" (id,name) VALUES ('1','foo1');"#);
 
   buffer.clear();
-  a_table_defs.write_update(&mut [Default::default(); MAX_NODES_NUM], &mut buffer).unwrap();
+  a_table_defs.write_update(&mut <_>::default(), &mut buffer).unwrap();
   assert_eq!(&buffer, r#"UPDATE a SET id='1',name='foo1' WHERE id='1';"#);
 }

@@ -53,12 +53,12 @@ macro_rules! impl_display {
 }
 
 impl_display!(&'_ str);
-impl_display!(String);
 impl_display!(bool);
 impl_display!(i32);
 impl_display!(i64);
 impl_display!(u32);
 impl_display!(u64);
+impl_display!(String);
 
 #[cfg(feature = "arrayvec")]
 impl_display!(arrayvec::ArrayString<N>, const N: usize);
